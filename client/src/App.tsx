@@ -43,6 +43,39 @@ export default function App() {
     })
   );
 
+  // Virtualization Setup
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  const filteredFiles = files.filter(file => {
+    const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesScope = selectedScopeId ? file.scopeId === selectedScopeId : true;
+    const matchesTag = selectedTagId ? file.tags.some((t: any) => t.id === selectedTagId) : true;
+    return matchesSearch && matchesScope && matchesTag;
+  });
+
+  const sortedFiles = [...filteredFiles].sort((a, b) => {
+    let valA: any = a[sortBy];
+    let valB: any = b[sortBy];
+
+    if (sortBy === 'updatedAt') {
+        valA = new Date(a.updatedAt).getTime();
+        valB = new Date(b.updatedAt).getTime();
+    }
+
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const rowVirtualizer = useVirtualizer({
+    count: sortedFiles.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60, // approximate row height
+    overscan: 5,
+  });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
   useEffect(() => {
     if (isAuthenticated) {
         init();
@@ -151,15 +184,6 @@ export default function App() {
     }
   };
 
-  const handleSort = (field: 'name' | 'size' | 'updatedAt') => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-  };
-
   if (!isAuthenticated) {
       return (
           <Container size="xs" mt="xl">
@@ -193,41 +217,6 @@ export default function App() {
           </Container>
       );
   }
-
-  // --- Main App Logic ---
-
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesScope = selectedScopeId ? file.scopeId === selectedScopeId : true;
-    const matchesTag = selectedTagId ? file.tags.some((t: any) => t.id === selectedTagId) : true;
-    return matchesSearch && matchesScope && matchesTag;
-  });
-
-  const sortedFiles = [...filteredFiles].sort((a, b) => {
-    let valA: any = a[sortBy];
-    let valB: any = b[sortBy];
-
-    if (sortBy === 'updatedAt') {
-        valA = new Date(a.updatedAt).getTime();
-        valB = new Date(b.updatedAt).getTime();
-    }
-
-    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  // Virtualization Setup
-  const parentRef = useRef<HTMLDivElement>(null);
-  
-  const rowVirtualizer = useVirtualizer({
-    count: sortedFiles.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 60, // approximate row height
-    overscan: 5,
-  });
-
-  const virtualItems = rowVirtualizer.getVirtualItems();
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
