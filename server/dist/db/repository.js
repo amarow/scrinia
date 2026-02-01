@@ -122,6 +122,42 @@ exports.fileRepository = {
         });
         return runTransaction();
     },
+    async addTagToFiles(userId, fileIds, tagName) {
+        const runTransaction = client_1.db.transaction(() => {
+            // 1. Find or Create Tag (once)
+            const upsertTag = client_1.db.prepare(`
+            INSERT INTO Tag (userId, name) VALUES (?, ?)
+            ON CONFLICT(userId, name) DO NOTHING
+        `);
+            upsertTag.run(userId, tagName);
+            const getTag = client_1.db.prepare('SELECT id FROM Tag WHERE userId = ? AND name = ?');
+            const tag = getTag.get(userId, tagName);
+            // 2. Process Files
+            const checkFile = client_1.db.prepare(`
+            SELECT f.id FROM FileHandle f 
+            JOIN Scope s ON f.scopeId = s.id 
+            WHERE f.id = ? AND s.userId = ?
+        `);
+            const link = client_1.db.prepare(`
+            INSERT OR IGNORE INTO _FileHandleToTag (A, B) VALUES (?, ?)
+        `);
+            const updatedFiles = [];
+            for (const fileId of fileIds) {
+                const file = checkFile.get(fileId, userId);
+                if (file) {
+                    link.run(fileId, tag.id);
+                    // We don't return full objects to save bandwidth on massive updates,
+                    // but returning IDs allows client to update locally.
+                    updatedFiles.push(fileId);
+                }
+            }
+            return {
+                tag,
+                updatedFileIds: updatedFiles
+            };
+        });
+        return runTransaction();
+    },
     async removeTagFromFile(userId, fileId, tagId) {
         const runTransaction = client_1.db.transaction(() => {
             // 1. Verify access
@@ -186,6 +222,28 @@ exports.tagRepository = {
         const stmt = client_1.db.prepare('INSERT INTO Tag (userId, name, color) VALUES (?, ?, ?)');
         const info = stmt.run(userId, name, color);
         return { id: Number(info.lastInsertRowid), userId, name, color };
+    },
+    async update(userId, id, updates) {
+        const { name, color } = updates;
+        const fields = [];
+        const values = [];
+        if (name !== undefined) {
+            fields.push('name = ?');
+            values.push(name);
+        }
+        if (color !== undefined) {
+            fields.push('color = ?');
+            values.push(color);
+        }
+        if (fields.length === 0)
+            return null;
+        values.push(id);
+        values.push(userId);
+        const stmt = client_1.db.prepare(`UPDATE Tag SET ${fields.join(', ')} WHERE id = ? AND userId = ?`);
+        stmt.run(...values);
+        // Return updated tag
+        const getStmt = client_1.db.prepare('SELECT * FROM Tag WHERE id = ?');
+        return getStmt.get(id);
     },
     async delete(userId, id) {
         const stmt = client_1.db.prepare('DELETE FROM Tag WHERE id = ? AND userId = ?');

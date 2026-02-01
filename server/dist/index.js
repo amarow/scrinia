@@ -210,8 +210,16 @@ app.delete('/api/scopes/:id', auth_1.authenticateToken, async (req, res) => {
 // Files
 app.get('/api/files', auth_1.authenticateToken, async (req, res) => {
     const userId = req.user.id;
-    const files = await repository_1.fileRepository.getAll(userId);
-    res.json(files);
+    const start = Date.now();
+    try {
+        const files = await repository_1.fileRepository.getAll(userId);
+        console.log(`[API] Fetched ${files.length} files for user ${userId} in ${Date.now() - start}ms`);
+        res.json(files);
+    }
+    catch (e) {
+        console.error(`[API] Failed to fetch files: ${e.message}`);
+        res.status(500).json({ error: e.message });
+    }
 });
 app.post('/api/files/:id/open', auth_1.authenticateToken, async (req, res) => {
     try {
@@ -295,6 +303,25 @@ app.post('/api/files/:id/tags', auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+app.post('/api/files/bulk-tags', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { fileIds, tagName } = req.body;
+        console.log(`[API] Bulk tag request: Adding "${tagName}" to ${fileIds?.length} files for user ${userId}`);
+        if (!fileIds || !Array.isArray(fileIds) || !tagName) {
+            res.status(400).json({ error: 'Invalid payload' });
+            return;
+        }
+        const start = Date.now();
+        const result = await repository_1.fileRepository.addTagToFiles(userId, fileIds, tagName);
+        console.log(`[API] Bulk tag completed in ${Date.now() - start}ms. Updated ${result.updatedFileIds.length} files.`);
+        res.json(result);
+    }
+    catch (e) {
+        console.error(`[API] Bulk tag failed:`, e);
+        res.status(500).json({ error: e.message });
+    }
+});
 app.delete('/api/files/:fileId/tags/:tagId', auth_1.authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -325,6 +352,26 @@ app.post('/api/tags', auth_1.authenticateToken, async (req, res) => {
     catch (e) {
         if (e.code === 'P2002') {
             res.status(409).json({ error: 'Tag already exists' });
+            return;
+        }
+        res.status(500).json({ error: e.message });
+    }
+});
+app.patch('/api/tags/:id', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { id } = req.params;
+        const { name, color } = req.body;
+        const updatedTag = await repository_1.tagRepository.update(userId, Number(id), { name, color });
+        if (!updatedTag) {
+            res.status(404).json({ error: 'Tag not found' });
+            return;
+        }
+        res.json(updatedTag);
+    }
+    catch (e) {
+        if (e.code === 'P2002') { // Or SQLite unique constraint error
+            res.status(409).json({ error: 'Tag name already exists' });
             return;
         }
         res.status(500).json({ error: e.message });
