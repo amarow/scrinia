@@ -155,63 +155,75 @@ export function HomePage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-               {virtualItems.length > 0 && (
-                  <tr>
-                      <td style={{ height: virtualItems[0]?.start || 0, padding: 0, border: 0 }} colSpan={5} />
-                  </tr>
-               )}
-               {virtualItems.map((virtualRow) => {
-                 const file = sortedFiles[virtualRow.index];
-                 if (!file) return null;
-                 const isSelected = selectedIdSet.has(file.id);
-                 return (
-                    <FileRow key={file.id} file={file} data-index={virtualRow.index}>
-                        <Table.Td>
-                            <Checkbox 
-                                checked={isSelected}
-                                onChange={() => toggleFileSelection(file.id)}
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                        </Table.Td>
-                        <Table.Td>
-                            <Group gap="xs" wrap="nowrap">
-                                <div style={{ flex: 1, overflow: 'hidden' }}>
-                                    <Text size="sm" fw={500} style={{ wordBreak: 'break-all', cursor: 'pointer' }} onClick={() => openFile(file.id)}>
-                                        {file.name}
-                                    </Text>
-                                    <Text size="xs" c="dimmed" style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {file.path}
-                                    </Text>
-                                </div>
-                            </Group>
-                        </Table.Td>
-                        <Table.Td>
-                            <Group gap={5}>
-                            {file.tags.map((tag: any) => (
-                                <Badge 
-                                key={tag.id} 
-                                variant="light" 
-                                color={tag.color || 'appleBlue'}
-                                rightSection={
-                                    <ActionIcon size="xs" color="gray" variant="transparent" onClick={(e) => { e.stopPropagation(); removeTagFromFile(file.id, tag.id); }}>
-                                    <IconX size={10} />
-                                    </ActionIcon>
-                                }
-                                >
-                                {tag.name}
-                                </Badge>
-                            ))}
-                            </Group>
-                        </Table.Td>
-                        <Table.Td>{(file.size / 1024).toFixed(1)} KB</Table.Td>
-                        <Table.Td>{new Date(file.updatedAt).toLocaleDateString()}</Table.Td>
-                    </FileRow>
-                 );
-               })}
-               {virtualItems.length > 0 && (
-                  <tr>
-                      <td style={{ height: rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end || 0), padding: 0, border: 0 }} colSpan={5} />
-                  </tr>
+               {isLoading && filteredFiles.length === 0 ? (
+                   <tr>
+                       <td colSpan={5}>
+                           <Center h={200}>
+                               <Loader type="dots" />
+                           </Center>
+                       </td>
+                   </tr>
+               ) : (
+                   <>
+                   {virtualItems.length > 0 && (
+                      <tr>
+                          <td style={{ height: virtualItems[0]?.start || 0, padding: 0, border: 0 }} colSpan={5} />
+                      </tr>
+                   )}
+                   {virtualItems.map((virtualRow) => {
+                     const file = sortedFiles[virtualRow.index];
+                     if (!file) return null;
+                     const isSelected = selectedIdSet.has(file.id);
+                     return (
+                        <FileRow key={file.id} file={file} data-index={virtualRow.index}>
+                            <Table.Td>
+                                <Checkbox 
+                                    checked={isSelected}
+                                    onChange={() => toggleFileSelection(file.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </Table.Td>
+                            <Table.Td>
+                                <Group gap="xs" wrap="nowrap">
+                                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                                        <Text size="sm" fw={500} style={{ wordBreak: 'break-all', cursor: 'pointer' }} onClick={() => openFile(file.id)}>
+                                            {file.name}
+                                        </Text>
+                                        <Text size="xs" c="dimmed" style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {file.path}
+                                        </Text>
+                                    </div>
+                                </Group>
+                            </Table.Td>
+                            <Table.Td>
+                                <Group gap={5}>
+                                {file.tags.map((tag: any) => (
+                                    <Badge 
+                                    key={tag.id} 
+                                    variant="light" 
+                                    color={tag.color || 'appleBlue'}
+                                    rightSection={
+                                        <ActionIcon size="xs" color="gray" variant="transparent" onClick={(e) => { e.stopPropagation(); removeTagFromFile(file.id, tag.id); }}>
+                                        <IconX size={10} />
+                                        </ActionIcon>
+                                    }
+                                    >
+                                    {tag.name}
+                                    </Badge>
+                                ))}
+                                </Group>
+                            </Table.Td>
+                            <Table.Td>{(file.size / 1024).toFixed(1)} KB</Table.Td>
+                            <Table.Td>{new Date(file.updatedAt).toLocaleDateString()}</Table.Td>
+                        </FileRow>
+                     );
+                   })}
+                   {virtualItems.length > 0 && (
+                      <tr>
+                          <td style={{ height: rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end || 0), padding: 0, border: 0 }} colSpan={5} />
+                      </tr>
+                   )}
+                   </>
                )}
             </Table.Tbody>
           </Table>

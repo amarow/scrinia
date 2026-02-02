@@ -47,12 +47,13 @@ export const fileRepository = {
 
     // Using UPSERT syntax (INSERT OR REPLACE / ON CONFLICT)
     // SQLite supports ON CONFLICT(scopeId, path) DO UPDATE
+    // Use mtime (modification time) from file stats for updatedAt
     const sql = `
       INSERT INTO FileHandle (scopeId, path, name, extension, size, mimeType, updatedAt)
-      VALUES (@scopeId, @path, @name, @extension, @size, @mimeType, CURRENT_TIMESTAMP)
+      VALUES (@scopeId, @path, @name, @extension, @size, @mimeType, @mtime)
       ON CONFLICT(scopeId, path) DO UPDATE SET
         size = excluded.size,
-        updatedAt = CURRENT_TIMESTAMP
+        updatedAt = excluded.updatedAt
     `;
     
     const stmt = db.prepare(sql);
@@ -62,7 +63,8 @@ export const fileRepository = {
         name: filename,
         extension,
         size: stats.size,
-        mimeType
+        mimeType,
+        mtime: stats.mtime.toISOString() // Store as ISO string
     });
   },
 
