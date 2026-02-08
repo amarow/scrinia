@@ -1,5 +1,5 @@
 import { Group, Text, Loader, Alert, Stack, Badge, Table, ActionIcon, Button, Center, Checkbox } from '@mantine/core';
-import { IconFiles, IconAlertCircle, IconX, IconSettings } from '@tabler/icons-react';
+import { IconFiles, IconAlertCircle, IconX, IconHammer } from '@tabler/icons-react';
 import { useState, useRef, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -113,7 +113,7 @@ export function HomePage() {
               <Stack align="center">
                   <Text size="lg" fw={500} c="dimmed">{t.noScopesActive}</Text>
                   <Text size="sm" c="dimmed">{t.goToSettings}</Text>
-                  <Button leftSection={<IconSettings size={16} />} onClick={() => navigate('/settings')}>
+                  <Button leftSection={<IconHammer size={16} />} onClick={() => navigate('/settings')}>
                       {t.settings}
                   </Button>
               </Stack>

@@ -104,11 +104,11 @@ export function FilePreviewModal() {
                     </Button>
                 </Group>
             }
-            size="auto"
+            size="95vw"
             padding="md"
             styles={{ 
                 content: { maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
-                body: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: '60vw', maxWidth: '95vw', overflow: 'hidden' },
+                body: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: '60vw', maxWidth: '95vw', overflow: 'hidden', minHeight: '80vh' },
                 header: { width: '100%', flexShrink: 0 },
                 title: { flex: 1 }
             }}
@@ -131,11 +131,13 @@ export function FilePreviewModal() {
                         )}
 
                         {isPdf && (
-                            <iframe 
-                                src={fileUrl} 
-                                style={{ width: '100%', height: '100%', border: 'none' }} 
-                                title="PDF Preview"
-                            />
+                            <div style={{ flex: '1 1 0', minHeight: 0 }}>
+                                <iframe 
+                                    src={fileUrl} 
+                                    style={{ width: '100%', height: '100%', border: 'none' }} 
+                                    title="PDF Preview"
+                                />
+                            </div>
                         )}
 
                         {isAudio && (
@@ -149,16 +151,16 @@ export function FilePreviewModal() {
                         )}
 
                         {isVideo && (
-                            <Center h="100%">
+                            <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                 <video 
                                     controls 
                                     autoPlay 
                                     src={fileUrl} 
                                     style={{ maxHeight: '100%', maxWidth: '100%' }}
                                 >
-                                    Your browser does not support the video element.
+                                    Your browser does not support the audio element.
                                 </video>
-                            </Center>
+                            </div>
                         )}
 
                         {isText && (

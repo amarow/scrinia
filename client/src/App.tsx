@@ -1,6 +1,6 @@
 import { AppShell, Burger, Group, Text, ScrollArea, Button, Stack, Badge, ActionIcon, TextInput, NavLink, useMantineColorScheme, Card, PasswordInput, Container, Modal, ColorSwatch, Alert, Center, Checkbox, Loader } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconTags, IconPlus, IconX, IconSearch, IconSun, IconMoon, IconLogout, IconTrash, IconSettings, IconPencil, IconCheck } from '@tabler/icons-react';
+import { IconTags, IconPlus, IconX, IconSearch, IconSun, IconMoon, IconLogout, IconTrash, IconHammer, IconPencil, IconCheck } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useAppStore } from './store';
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, type DragEndEvent } from '@dnd-kit/core';
@@ -250,12 +250,12 @@ export default function App() {
             </Button>
             <ActionIcon 
                 onClick={() => navigate('/settings')} 
-                variant={location.pathname === '/settings' ? "filled" : "default"} 
+                variant="default" 
                 size="lg" 
                 aria-label={t.settings}
                 title={t.settings}
             >
-                <IconSettings size={18} />
+                <IconHammer size={18} />
             </ActionIcon>
             <ActionIcon onClick={() => toggleColorScheme()} variant="default" size="lg" aria-label="Toggle color scheme">
                 {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
