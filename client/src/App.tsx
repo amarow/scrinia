@@ -337,16 +337,19 @@ export default function App() {
                 >
                     <Group gap={0} wrap="nowrap">
                         <Button 
-                        variant={isSelected ? "filled" : "subtle"}
+                        variant={isSelected ? "light" : "subtle"}
                         color={isSelected ? (tag.color || "appleBlue") : "gray"}
                         fullWidth 
-                        justify="space-between" 
                         size="xs"
-                        leftSection={
-                            !isSelected && tag.color ? 
-                            <ColorSwatch color={tag.color} size={10} /> : null
+                        justify="space-between"
+                        leftSection={<div style={{ width: 30 }} />} // Spacer to balance the right-side count
+                        rightSection={
+                            <div style={{ width: 30, textAlign: 'right', display: 'flex', justifyContent: 'flex-end' }}>
+                                <Text size="xs" fw={700} c={isSelected ? (tag.color || "appleBlue") : "dimmed"}>
+                                    {tag._count?.files}
+                                </Text>
+                            </div>
                         }
-                        rightSection={<Badge size="xs" variant="transparent" color={isSelected ? "white" : "gray"}>{tag._count?.files}</Badge>}
                         style={{ 
                             pointerEvents: 'none', 
                             borderTopRightRadius: 0, 
@@ -355,12 +358,14 @@ export default function App() {
                             fontWeight: 500
                         }} 
                         >
-                        {tag.name}
+                        <Text size="xs" fw={600} style={{ flex: 1, textAlign: 'center' }}>
+                            {tag.name}
+                        </Text>
                         </Button>
                         <ActionIcon 
                             size="30px" 
-                            variant={isSelected ? "filled" : "subtle"}
-                            color={isSelected ? (tag.color || "appleBlue") : "gray"}
+                            variant={isSelected ? "light" : "subtle"}
+                            color={isSelected ? (tag.color || "appleBlue") : (tag.color || "gray")}
                             style={{ borderRadius: 0, borderRight: '1px solid rgba(0,0,0,0.1)' }}
                             onClick={(e) => openEditTagModal(tag, e)}
                             title={t.editTag}
@@ -369,7 +374,7 @@ export default function App() {
                         </ActionIcon>
                         <ActionIcon 
                             size="30px" 
-                            variant={isSelected ? "filled" : "subtle"}
+                            variant={isSelected ? "light" : "subtle"}
                             color={isSelected ? (tag.color || "appleBlue") : "gray"}
                             style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
                             onClick={(e) => handleDeleteTag(e, tag)}
@@ -424,11 +429,12 @@ export default function App() {
                 data-autofocus
                 styles={{
                     input: {
-                        backgroundColor: editColor,
-                        color: ['#fab005', '#fcc419'].includes(editColor) ? 'black' : 'white',
-                        fontWeight: 600,
+                        backgroundColor: `${editColor}15`, // ~8% opacity for "light" effect
+                        color: editColor,
+                        fontWeight: 700,
                         textAlign: 'center',
-                        border: '1px solid rgba(0,0,0,0.1)',
+                        border: `1px solid ${editColor}30`,
+                        fontSize: '1.1rem'
                     }
                 }}
             />
@@ -447,7 +453,13 @@ export default function App() {
                 ))}
             </Group>
 
-            <Button fullWidth onClick={handleUpdateTag} variant="default">{t.save}</Button>
+            <Button 
+                fullWidth 
+                onClick={handleUpdateTag} 
+                variant="default"
+            >
+                {t.save}
+            </Button>
         </Stack>
     </Modal>
     </DndContext>
