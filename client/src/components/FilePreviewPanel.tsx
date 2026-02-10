@@ -1,13 +1,13 @@
-import { Image, Text, LoadingOverlay, Button, Group, Center, Code, Table, Paper, ActionIcon, Stack } from '@mantine/core';
+import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, ActionIcon, Stack } from '@mantine/core';
 import { useAppStore } from '../store';
 import { useEffect, useState } from 'react';
 import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconX } from '@tabler/icons-react';
-import ReactMarkdown from 'react-markdown';
-import Papa from 'papaparse';
+import { FileViewer } from './FileViewer';
 
 export function FilePreviewPanel() {
     const { previewFileId, setPreviewFileId, files, searchResults, token, openFile } = useAppStore();
-    const [textContent, setTextContent] = useState<string | null>(null);
+    const [zipContent, setZipContent] = useState<any[] | null>(null);
+    const [selectedZipEntry, setSelectedZipEntry] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -20,81 +20,101 @@ export function FilePreviewPanel() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                setPreviewFileId(null);
+                if (selectedZipEntry) {
+                    setSelectedZipEntry(null);
+                } else {
+                    setPreviewFileId(null);
+                }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [setPreviewFileId]);
+    }, [setPreviewFileId, selectedZipEntry]);
 
     useEffect(() => {
         if (!file || !token) return;
         
+        // Reset state on file change
+        setZipContent(null);
+        setSelectedZipEntry(null);
+        setError(null);
+        setLoading(false);
+
         const ext = file.extension.toLowerCase();
-        // Expanded list of text-like files
-        const isText = [
-            '.txt', '.md', '.json', '.ts', '.js', '.jsx', '.tsx', '.css', '.scss', '.html', '.xml', '.yaml', '.yml', '.sql', '.env', '.log', '.sh', '.py',
-            '.rs', '.go', '.c', '.cpp', '.h', '.java', '.kt', '.rb', '.php', '.pl', '.lua', '.toml', '.ini', '.conf', '.dockerfile', '.csv', '.svg'
-        ].includes(ext);
+        const isZip = ['.zip', '.7z', '.rar', '.tar', '.gz'].includes(ext);
         
-        if (isText) {
+        if (isZip) {
             setLoading(true);
-            setError(null);
-            fetch(`${API_BASE}/api/files/${file.id}/content?token=${token}`)
+            fetch(`${API_BASE}/api/files/${file.id}/zip-content?token=${token}`)
                 .then(res => {
-                    if (!res.ok) throw new Error("Failed to load content");
-                    return res.text();
+                    if (!res.ok) throw new Error("Failed to load archive content");
+                    return res.json();
                 })
-                .then(text => {
-                    // Limit text size for performance
-                    if (text.length > 100000) {
-                        setTextContent(text.substring(0, 100000) + `\n\n... (Content truncated for preview) ...`);
-                    } else {
-                        setTextContent(text);
-                    }
+                .then(data => {
+                    setZipContent(data);
                     setLoading(false);
                 })
                 .catch(err => {
                     setError(err.message);
                     setLoading(false);
                 });
-        } else {
-            setTextContent(null);
-            setLoading(false);
-            setError(null);
         }
     }, [file, token]);
 
     if (!file) return null;
 
+    // Main file URL
     const fileUrl = `${API_BASE}/api/files/${file.id}/content?token=${token}`;
     const ext = file.extension.toLowerCase();
-    const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.avif'].includes(ext); // Removed .svg from image list to treat as text/code unless rendered as img? Actually SVG is fine as img.
-    const isPdf = ext === '.pdf';
-    const isAudio = ['.mp3', '.wav', '.ogg', '.flac', '.aac'].includes(ext);
-    const isVideo = ['.mp4', '.webm', '.ogg', '.mov'].includes(ext);
-    const isMarkdown = ['.md', '.markdown'].includes(ext);
-    const isCsv = ['.csv'].includes(ext);
-    const isJson = ['.json'].includes(ext);
-    const isCodeOrText = textContent !== null;
+    const isZip = ['.zip', '.7z', '.rar', '.tar', '.gz'].includes(ext);
 
-    // Helper for CSV parsing
-    let parsedCsv: any[] = [];
-    let csvColumns: string[] = [];
-    if (isCsv && textContent) {
-        const result = Papa.parse(textContent, { header: true, skipEmptyLines: true });
-        parsedCsv = result.data;
-        csvColumns = result.meta.fields || [];
-    }
+    // ZIP Entry Handling
+    if (selectedZipEntry) {
+        const entryUrl = `${API_BASE}/api/files/${file.id}/zip-entry?path=${encodeURIComponent(selectedZipEntry)}&token=${token}`;
+        // Guess extension from entry path
+        const entryExt = '.' + selectedZipEntry.split('.').pop() || '';
+        const entryName = selectedZipEntry.split('/').pop() || selectedZipEntry;
 
-    // Helper for JSON formatting
-    let formattedJson = textContent;
-    if (isJson && textContent) {
-        try {
-            formattedJson = JSON.stringify(JSON.parse(textContent), null, 2);
-        } catch (e) {
-            // Keep original text on error
-        }
+        return (
+            <Paper 
+                style={{ 
+                    height: 'calc(100vh - 100px)', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    overflow: 'hidden',
+                    border: '1px solid var(--mantine-color-default-border)',
+                    position: 'relative'
+                }} 
+                p="md" 
+                shadow="xs"
+            >
+                {/* Header for Zip Entry */}
+                <Group justify="space-between" mb="md" style={{ flexShrink: 0 }}>
+                    <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                        <Button 
+                            variant="subtle" 
+                            color="gray" 
+                            leftSection={<IconArrowLeft size={20} />}
+                            onClick={() => setSelectedZipEntry(null)}
+                        >
+                            Back to Archive
+                        </Button>
+                        <div style={{ minWidth: 0, borderLeft: '1px solid var(--mantine-color-default-border)', paddingLeft: '1rem' }}>
+                            <Text fw={700} size="lg" truncate>{entryName}</Text>
+                            <Text size="xs" c="dimmed" style={{ wordBreak: 'break-all' }} truncate>{selectedZipEntry}</Text>
+                        </div>
+                    </Group>
+                </Group>
+
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <FileViewer 
+                        url={entryUrl} 
+                        filename={entryName} 
+                        extension={entryExt} 
+                    />
+                </div>
+            </Paper>
+        );
     }
 
     return (
@@ -113,10 +133,15 @@ export function FilePreviewPanel() {
             {/* Header */}
             <Group justify="space-between" mb="md" style={{ flexShrink: 0 }}>
                 <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                    <ActionIcon variant="subtle" color="gray" onClick={() => setPreviewFileId(null)}>
-                        <IconArrowLeft size={20} />
-                    </ActionIcon>
-                    <div style={{ minWidth: 0 }}>
+                    <Button 
+                        variant="subtle" 
+                        color="gray" 
+                        leftSection={<IconArrowLeft size={20} />}
+                        onClick={() => setPreviewFileId(null)}
+                    >
+                        Back
+                    </Button>
+                    <div style={{ minWidth: 0, borderLeft: '1px solid var(--mantine-color-default-border)', paddingLeft: '1rem' }}>
                         <Text fw={700} size="lg" truncate>{file.name}</Text>
                         <Text size="xs" c="dimmed" style={{ wordBreak: 'break-all' }} truncate>{file.path}</Text>
                     </div>
@@ -151,87 +176,48 @@ export function FilePreviewPanel() {
                 )}
 
                 {!loading && !error && (
-                    <div style={{ flex: 1, overflow: 'auto', height: '100%' }}>
-                        {isImage && (
-                            <Center h="100%" style={{ minHeight: '300px' }}>
-                                <Image src={fileUrl} fit="contain" style={{ maxHeight: '100%', maxWidth: '100%' }} />
-                            </Center>
-                        )}
-
-                        {isPdf && (
-                            <iframe 
-                                src={fileUrl} 
-                                style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} 
-                                title="PDF Preview"
+                    <>
+                        {isZip && zipContent ? (
+                            <div style={{ overflow: 'auto', maxHeight: '100%' }}>
+                                <Table striped highlightOnHover>
+                                    <Table.Thead>
+                                        <Table.Tr>
+                                            <Table.Th>Name</Table.Th>
+                                            <Table.Th>Size</Table.Th>
+                                            <Table.Th>Compressed</Table.Th>
+                                        </Table.Tr>
+                                    </Table.Thead>
+                                    <Table.Tbody>
+                                        {zipContent.map((entry: any, i: number) => (
+                                            <Table.Tr 
+                                                key={i} 
+                                                style={{ cursor: entry.isDirectory ? 'default' : 'pointer' }}
+                                                onClick={() => !entry.isDirectory && setSelectedZipEntry(entry.path)}
+                                            >
+                                                <Table.Td>
+                                                    <Group gap="xs">
+                                                        <Text size="sm" fw={entry.isDirectory ? 700 : 400} c={entry.isDirectory ? 'dimmed' : undefined}>
+                                                            {entry.name}
+                                                        </Text>
+                                                    </Group>
+                                                </Table.Td>
+                                                <Table.Td>{entry.isDirectory ? '-' : `${(entry.size / 1024).toFixed(1)} KB`}</Table.Td>
+                                                <Table.Td>{entry.isDirectory ? '-' : `${(entry.compressedSize / 1024).toFixed(1)} KB`}</Table.Td>
+                                            </Table.Tr>
+                                        ))}
+                                    </Table.Tbody>
+                                </Table>
+                            </div>
+                        ) : (
+                            // Standard File Viewer for non-zip or loading phase
+                            <FileViewer 
+                                url={fileUrl} 
+                                filename={file.name} 
+                                extension={ext} 
+                                onOpenExternally={() => openFile(file.id)}
                             />
                         )}
-
-                        {isAudio && (
-                            <Center h="100%" style={{ flexDirection: 'column', gap: 16 }}>
-                                <IconFileUnknown size={64} color="gray" />
-                                <Text size="lg">{file.name}</Text>
-                                <audio controls autoPlay src={fileUrl} style={{ width: '80%' }}>
-                                    Your browser does not support the audio element.
-                                </audio>
-                            </Center>
-                        )}
-
-                        {isVideo && (
-                            <Center h="100%">
-                                <video 
-                                    controls 
-                                    autoPlay 
-                                    src={fileUrl} 
-                                    style={{ maxHeight: '100%', maxWidth: '100%' }}
-                                >
-                                    Your browser does not support the video element.
-                                </video>
-                            </Center>
-                        )}
-
-                        {isCodeOrText && !isPdf && (
-                            <div style={{ padding: '0.5rem', height: '100%' }}>
-                                {isMarkdown ? (
-                                    <div className="markdown-body" style={{ maxWidth: '800px', margin: '0 auto' }}>
-                                        <ReactMarkdown>{textContent || ''}</ReactMarkdown>
-                                    </div>
-                                ) : isCsv ? (
-                                    <div style={{ overflow: 'auto', maxHeight: '100%' }}>
-                                        <Table striped highlightOnHover withTableBorder withColumnBorders>
-                                            <Table.Thead>
-                                                <Table.Tr>
-                                                    {csvColumns.map((key) => (
-                                                        <Table.Th key={key} style={{ whiteSpace: 'nowrap' }}>{key}</Table.Th>
-                                                    ))}
-                                                </Table.Tr>
-                                            </Table.Thead>
-                                            <Table.Tbody>
-                                                {parsedCsv.map((row: any, i) => (
-                                                    <Table.Tr key={i}>
-                                                        {csvColumns.map((col) => (
-                                                            <Table.Td key={col} style={{ whiteSpace: 'nowrap' }}>{row[col]}</Table.Td>
-                                                        ))}
-                                                    </Table.Tr>
-                                                ))}
-                                            </Table.Tbody>
-                                        </Table>
-                                    </div>
-                                ) : (
-                                    <Code block style={{ whiteSpace: 'pre-wrap', minHeight: '100%' }}>
-                                        {isJson ? formattedJson : textContent}
-                                    </Code>
-                                )}
-                            </div>
-                        )}
-
-                        {!isImage && !isPdf && !isCodeOrText && !isAudio && !isVideo && (
-                            <Center h="100%" style={{ flexDirection: 'column', gap: 16 }}>
-                                <IconFileUnknown size={64} color="gray" />
-                                <Text c="dimmed">No preview available for this file type.</Text>
-                                <Button onClick={() => openFile(file.id)}>Open Externally</Button>
-                            </Center>
-                        )}
-                    </div>
+                    </>
                 )}
             </div>
         </Paper>

@@ -17,12 +17,14 @@
     "@tabler/icons-react": "^3.36.1",
     "@tanstack/react-virtual": "^3.13.18",
     "@types/papaparse": "^5.5.2",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "clsx": "^2.1.1",
     "papaparse": "^5.5.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.0",
+    "react-syntax-highlighter": "^16.1.0",
     "zustand": "^5.0.10"
   },
   "devDependencies": {

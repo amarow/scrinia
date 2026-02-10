@@ -8,6 +8,8 @@ import { authService, authenticateToken, AuthRequest } from './auth';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import os from 'os';
+import AdmZip from 'adm-zip';
+import heicConvert from 'heic-convert';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -166,6 +168,8 @@ app.post('/api/scopes', authenticateToken, async (req, res) => {
     }
 });
 
+import { ensureSystemTags } from './db/user';
+
 app.post('/api/scopes/:id/refresh', authenticateToken, async (req, res) => {
     try {
         const userId = (req as AuthRequest).user!.id;
@@ -177,9 +181,16 @@ app.post('/api/scopes/:id/refresh', authenticateToken, async (req, res) => {
             return;
         }
 
-        // Trigger scan in background (Fire and Forget)
+        // 1. Ensure system tags exist for this user (just in case)
+        ensureSystemTags(userId);
+        
+        // 2. Trigger background scan (Fire and Forget)
         console.log(`[API] Triggering background scan for scope ${id}`);
-        crawlerService.scanScope(scope.id, scope.path).catch(err => {
+        crawlerService.scanScope(scope.id, scope.path).then(async () => {
+             // 3. After scan (or during), ensure files are tagged correctly
+             // This applies system tags to ALL files, which is what we want for "repair"
+             await fileRepository.applySystemTagsToAllFiles();
+        }).catch(err => {
             console.error(`[API] Background scan failed for scope ${scope.id}:`, err);
         });
         
@@ -220,16 +231,35 @@ app.get('/api/files/:id/content', authenticateToken, async (req, res) => {
         const { id } = req.params;
         
         const sql = `
-            SELECT f.path, f.mimeType 
+            SELECT f.path, f.mimeType, f.extension 
             FROM FileHandle f 
             JOIN Scope s ON f.scopeId = s.id 
             WHERE f.id = ? AND s.userId = ?
         `;
-        const file = db.prepare(sql).get(id, userId) as { path: string, mimeType: string };
+        const file = db.prepare(sql).get(id, userId) as { path: string, mimeType: string, extension: string };
         
         if (!file) {
              res.status(404).json({ error: 'File not found or access denied' });
              return;
+        }
+
+        // HEIC/HEIF Conversion to JPEG
+        if (file.extension.toLowerCase() === '.heic' || file.extension.toLowerCase() === '.heif') {
+            try {
+                const inputBuffer = await fs.readFile(file.path);
+                const outputBuffer = await heicConvert({
+                    buffer: inputBuffer as any,
+                    format: 'JPEG',
+                    quality: 0.8
+                });
+                
+                res.setHeader('Content-Type', 'image/jpeg');
+                res.send(Buffer.from(outputBuffer));
+                return;
+            } catch (err) {
+                console.error(`Failed to convert HEIC: ${err}`);
+                // Fallback to sending original file if conversion fails
+            }
         }
 
         // Optional: Set Content-Type header explicitly if needed, though sendFile usually handles it.
@@ -244,6 +274,101 @@ app.get('/api/files/:id/content', authenticateToken, async (req, res) => {
         });
 
     } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/files/:id/zip-content', authenticateToken, async (req, res) => {
+    try {
+        const userId = (req as AuthRequest).user!.id;
+        const { id } = req.params;
+        
+        const sql = `
+            SELECT f.path 
+            FROM FileHandle f 
+            JOIN Scope s ON f.scopeId = s.id 
+            WHERE f.id = ? AND s.userId = ?
+        `;
+        const file = db.prepare(sql).get(id, userId) as { path: string };
+        
+        if (!file) {
+             res.status(404).json({ error: 'File not found or access denied' });
+             return;
+        }
+
+        const zip = new AdmZip(file.path);
+        const zipEntries = zip.getEntries();
+        
+        const entries = zipEntries
+            .filter(entry => !entry.isDirectory)
+            .map(entry => ({
+                name: entry.entryName,
+                size: entry.header.size,
+                compressedSize: entry.header.compressedSize,
+                isDirectory: entry.isDirectory,
+                path: entry.entryName,
+                method: entry.header.method
+            }));
+
+        res.json(entries);
+    } catch (e: any) {
+        console.error("ZIP Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/files/:id/zip-entry', authenticateToken, async (req, res) => {
+    try {
+        const userId = (req as AuthRequest).user!.id;
+        const { id } = req.params;
+        const entryPath = req.query.path as string;
+
+        if (!entryPath) {
+            res.status(400).json({ error: 'Entry path is required' });
+            return;
+        }
+        
+        const sql = `
+            SELECT f.path 
+            FROM FileHandle f 
+            JOIN Scope s ON f.scopeId = s.id 
+            WHERE f.id = ? AND s.userId = ?
+        `;
+        const file = db.prepare(sql).get(id, userId) as { path: string };
+        
+        if (!file) {
+             res.status(404).json({ error: 'File not found or access denied' });
+             return;
+        }
+
+        const zip = new AdmZip(file.path);
+        const entry = zip.getEntry(entryPath);
+
+        if (!entry) {
+            res.status(404).json({ error: 'Entry not found in zip' });
+            return;
+        }
+
+        if (entry.isDirectory) {
+            res.status(400).json({ error: 'Cannot download a directory' });
+            return;
+        }
+
+        const buffer = entry.getData();
+        
+        // Try to detect mime type simply by extension
+        const ext = path.extname(entry.entryName).toLowerCase();
+        let contentType = 'application/octet-stream';
+        if (['.txt', '.md', '.json', '.js', '.ts', '.css', '.html', '.xml'].includes(ext)) contentType = 'text/plain';
+        if (['.jpg', '.jpeg'].includes(ext)) contentType = 'image/jpeg';
+        if (['.png'].includes(ext)) contentType = 'image/png';
+        if (['.pdf'].includes(ext)) contentType = 'application/pdf';
+
+        res.setHeader('Content-Type', contentType);
+        res.send(buffer);
+
+    } catch (e: any) {
+        console.error("ZIP Entry Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -507,5 +632,7 @@ app.put('/api/settings/search', authenticateToken, async (req, res) => {
 // Start Server & Crawler
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  // Run system tag update on startup (fire and forget or await)
+  await fileRepository.applySystemTagsToAllFiles();
   await crawlerService.init();
 });
