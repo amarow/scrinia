@@ -14,7 +14,7 @@ import fileRoutes from './routes/file.routes';
 import tagRoutes from './routes/tag.routes';
 import searchRoutes from './routes/search.routes';
 import settingsRoutes from './routes/settings.routes';
-import v1Routes from './routes/v1.routes';
+import publicRoutes from './routes/public.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,7 +40,7 @@ app.use('/api/tags', tagRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api', settingsRoutes); // For /api/preferences (compatibility)
-app.use('/api/v1', v1Routes);
+app.use('/api/v1', publicRoutes);
 
 // Status Route
 app.get('/status', authenticateToken, async (req, res) => {
