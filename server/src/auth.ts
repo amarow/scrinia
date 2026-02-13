@@ -6,14 +6,12 @@ import { db } from './db/client';
 import { ensureSystemTags } from './db/user';
 import { apiKeyRepository } from './db/repository';
 import { crawlerService } from './services/crawler';
+import type { User, ApiKey } from '@shared/types';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'super-secret-key-change-me';
 
 export interface AuthRequest extends Request {
-  user?: {
-    id: number;
-    username: string;
-  };
+  user?: User;
   apiKey?: {
     id: number;
     name: string;
@@ -95,104 +93,52 @@ export const authenticateApiKey = async (req: Request, res: Response, next: Next
   const apiKeyRecord = await apiKeyRepository.verify(key);
   if (!apiKeyRecord) return res.status(403).json({ error: 'Invalid API key' });
 
-    (req as AuthRequest).user = { id: apiKeyRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
+  (req as AuthRequest).user = { id: apiKeyRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
+  (req as AuthRequest).apiKey = {
+    id: apiKeyRecord.id,
+    name: apiKeyRecord.name,
+    permissions: apiKeyRecord.permissions.split(','),
+    privacyProfileId: apiKeyRecord.privacyProfileId
+  };
+  
+  // Trigger crawler for this user (background)
+  crawlerService.initUser(apiKeyRecord.userId).catch(console.error);
 
-    (req as AuthRequest).apiKey = {
+  next();
+};
 
-      id: apiKeyRecord.id,
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-      name: apiKeyRecord.name,
+  if (!token && req.query.token) {
+      token = req.query.token as string;
+  }
 
-      permissions: apiKeyRecord.permissions.split(','),
+  if (!token) return res.sendStatus(401);
 
-      privacyProfileId: apiKeyRecord.privacyProfileId
-
-    };
-
-    
+  jwt.verify(token, SECRET_KEY, (err: any, user: any) => {
+    if (err) return res.sendStatus(403);
+    (req as AuthRequest).user = user;
 
     // Trigger crawler for this user (background)
-
-    crawlerService.initUser(apiKeyRecord.userId).catch(console.error);
-
-  
+    crawlerService.initUser(user.id).catch(console.error);
 
     next();
+  });
+};
 
-  };
-
+export const authenticateAny = (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const apiKeyHeader = req.headers['x-api-key'];
   
-
-  export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-
-    const authHeader = req.headers['authorization'];
-
-    let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  
-
-    if (!token && req.query.token) {
-
-        token = req.query.token as string;
-
+  if (apiKeyHeader || (authHeader && authHeader.startsWith('Bearer '))) {
+    const token = authHeader && authHeader.split(' ')[1];
+    // Simple check: if it has 3 parts separated by dots, it's likely a JWT
+    if (token && token.split('.').length === 3) {
+        return authenticateToken(req, res, next);
     }
-
-  
-
-    if (!token) return res.sendStatus(401);
-
-  
-
-    jwt.verify(token, SECRET_KEY, (err: any, user: any) => {
-
-      if (err) return res.sendStatus(403);
-
-      (req as AuthRequest).user = user;
-
-  
-
-      // Trigger crawler for this user (background)
-
-      crawlerService.initUser(user.id).catch(console.error);
-
-  
-
-      next();
-
-        });
-
-      };
-
-    
-
-    export const authenticateAny = (req: Request, res: Response, next: NextFunction) => {
-
-      const authHeader = req.headers['authorization'];
-
-      const apiKeyHeader = req.headers['x-api-key'];
-
-      
-
-      if (apiKeyHeader || (authHeader && authHeader.startsWith('Bearer '))) {
-
-        const token = authHeader && authHeader.split(' ')[1];
-
-        // Simple check: if it has 3 parts separated by dots, it's likely a JWT
-
-        if (token && token.split('.').length === 3) {
-
-            return authenticateToken(req, res, next);
-
-        }
-
-        return authenticateApiKey(req, res, next);
-
-      }
-
-      return authenticateToken(req, res, next);
-
-    };
-
-    
-
-  
+    return authenticateApiKey(req, res, next);
+  }
+  return authenticateToken(req, res, next);
+};
