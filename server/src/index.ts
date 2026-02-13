@@ -109,6 +109,12 @@ app.post('/api/login', async (req, res) => {
         const { username, password } = req.body;
         const result = await authService.login(username, password);
         if (!result) return res.status(401).json({ error: 'Invalid credentials' });
+        
+        // Trigger crawler for this user
+        crawlerService.initUser(result.user.id).catch(err => {
+            console.error(`Failed to init crawler for user ${result.user.id}:`, err);
+        });
+
         res.json(result);
     } catch (e: any) {
         res.status(500).json({ error: e.message });
@@ -965,7 +971,6 @@ app.put('/api/settings/search', authenticateToken, async (req, res) => {
 // Start Server & Crawler
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  // Run system tag update on startup (fire and forget or await)
-  await fileRepository.applySystemTagsToAllFiles();
+  // Initialize base service (worker pool)
   await crawlerService.init();
 });

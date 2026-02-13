@@ -159,23 +159,31 @@ let poolInitialized = false;
 
 // --- End Worker Pool ---
 
+const initializedUsers = new Set<number>();
+
 export const crawlerService = {
   async init() {
-    console.log('[CRAWLER] Initializing...');
+    console.log('[CRAWLER] Initializing base service...');
     if (!poolInitialized) {
         initPool();
         poolInitialized = true;
         console.log(`[CRAWLER] Worker pool initialized with ${MAX_WORKERS} threads.`);
     }
+  },
 
-    const scopes = await scopeRepository.getAll();
+  async initUser(userId: number) {
+    if (initializedUsers.has(userId)) return;
+    
+    console.log(`[CRAWLER] Initializing scopes for user ${userId}...`);
+    const scopes = await scopeRepository.getAll(userId);
     for (const s of scopes) {
         const scope = s as { id: number, path: string };
-        console.log(`[CRAWLER] Triggering startup scan for scope ${scope.id} (${scope.path})`);
+        console.log(`[CRAWLER] Triggering background scan for scope ${scope.id} (${scope.path})`);
         this.scanScope(scope.id, scope.path).catch(err => {
-             console.error(`[CRAWLER] Error scanning scope ${scope.id} on startup:`, err);
+             console.error(`[CRAWLER] Error scanning scope ${scope.id} for user ${userId}:`, err);
         });
     }
+    initializedUsers.add(userId);
   },
 
   async addScope(userId: number, directoryPath: string) {

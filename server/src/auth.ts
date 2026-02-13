@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db/client';
 import { ensureSystemTags } from './db/user';
 import { apiKeyRepository } from './db/repository';
+import { crawlerService } from './services/crawler';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'super-secret-key-change-me';
 
@@ -94,30 +95,72 @@ export const authenticateApiKey = async (req: Request, res: Response, next: Next
   const apiKeyRecord = await apiKeyRepository.verify(key);
   if (!apiKeyRecord) return res.status(403).json({ error: 'Invalid API key' });
 
-  (req as AuthRequest).user = { id: apiKeyRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
-  (req as AuthRequest).apiKey = {
-    id: apiKeyRecord.id,
-    name: apiKeyRecord.name,
-    permissions: apiKeyRecord.permissions.split(','),
-    privacyProfileId: apiKeyRecord.privacyProfileId
-  };
+    (req as AuthRequest).user = { id: apiKeyRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
+
+    (req as AuthRequest).apiKey = {
+
+      id: apiKeyRecord.id,
+
+      name: apiKeyRecord.name,
+
+      permissions: apiKeyRecord.permissions.split(','),
+
+      privacyProfileId: apiKeyRecord.privacyProfileId
+
+    };
+
+    
+
+    // Trigger crawler for this user (background)
+
+    crawlerService.initUser(apiKeyRecord.userId).catch(console.error);
+
   
-  next();
-};
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  if (!token && req.query.token) {
-      token = req.query.token as string;
-  }
-
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, SECRET_KEY, (err: any, user: any) => {
-    if (err) return res.sendStatus(403);
-    (req as AuthRequest).user = user;
     next();
-  });
-};
+
+  };
+
+  
+
+  export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+
+    const authHeader = req.headers['authorization'];
+
+    let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  
+
+    if (!token && req.query.token) {
+
+        token = req.query.token as string;
+
+    }
+
+  
+
+    if (!token) return res.sendStatus(401);
+
+  
+
+    jwt.verify(token, SECRET_KEY, (err: any, user: any) => {
+
+      if (err) return res.sendStatus(403);
+
+      (req as AuthRequest).user = user;
+
+  
+
+      // Trigger crawler for this user (background)
+
+      crawlerService.initUser(user.id).catch(console.error);
+
+  
+
+      next();
+
+    });
+
+  };
+
+  
