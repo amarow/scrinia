@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { notifications } from '@mantine/notifications';
+import { translations } from './i18n';
 
 interface FileHandle {
   id: number;
@@ -381,7 +383,11 @@ export const useAppStore = create<AppState>()(
                   const data = await res.json();
                   if (!res.ok) throw new Error(data.error || 'Registration failed');
                   set({ isLoading: false, error: null });
-                  alert("Registration successful! Please login.");
+                  notifications.show({
+                      title: translations[get().language].registerSuccess,
+                      message: '',
+                      color: 'green'
+                  });
               } catch (e: any) {
                   set({ error: e.message, isLoading: false });
               }
@@ -399,7 +405,11 @@ export const useAppStore = create<AppState>()(
                       throw new Error(data.error || 'Password change failed');
                   }
                   set({ isLoading: false, error: null });
-                  alert("Password changed successfully.");
+                  notifications.show({
+                      title: translations[get().language].update || 'Updated',
+                      message: translations[get().language].password || 'Password changed',
+                      color: 'green'
+                  });
               } catch (e: any) {
                   set({ error: e.message, isLoading: false });
                   throw e;

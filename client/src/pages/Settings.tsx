@@ -4,6 +4,8 @@ import {
     useMantineColorScheme, SegmentedControl, PasswordInput, MultiSelect,
     Select, Switch, Table, Badge, Paper, Center
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { 
     IconFolder, IconPlus, IconRefresh, IconTrash, IconArrowUp, IconCheck,
     IconSunHigh, IconMoonStars, IconArrowLeft, IconKey, IconCopy,
@@ -220,7 +222,13 @@ export function SettingsPage() {
                                             variant="light" 
                                             color="red"
                                             onClick={() => { 
-                                                if(confirm(t.deleteScope)) deleteScope(scope.id); 
+                                                modals.openConfirmModal({
+                                                    title: t.deleteScopeTitle,
+                                                    children: <Text size="sm">{t.deleteScope}</Text>,
+                                                    labels: { confirm: t.delete, cancel: t.cancel },
+                                                    confirmProps: { color: 'red' },
+                                                    onConfirm: () => deleteScope(scope.id),
+                                                });
                                             }}
                                             title={t.removeScope}
                                         >
@@ -342,7 +350,13 @@ export function SettingsPage() {
                                             variant="light" 
                                             color="red"
                                             onClick={() => { 
-                                                if(confirm('Delete this API key?')) deleteApiKey(key.id); 
+                                                modals.openConfirmModal({
+                                                    title: t.deleteKeyTitle,
+                                                    children: <Text size="sm">{t.areYouSure}</Text>,
+                                                    labels: { confirm: t.delete, cancel: t.cancel },
+                                                    confirmProps: { color: 'red' },
+                                                    onConfirm: () => deleteApiKey(key.id),
+                                                });
                                             }}
                                         >
                                             <IconTrash size={16} />
@@ -408,7 +422,13 @@ export function SettingsPage() {
                                             variant="light" 
                                             color="red"
                                             onClick={() => { 
-                                                if(confirm('Delete this privacy profile?')) deletePrivacyProfile(profile.id); 
+                                                modals.openConfirmModal({
+                                                    title: t.deleteProfileTitle,
+                                                    children: <Text size="sm">{t.areYouSure}</Text>,
+                                                    labels: { confirm: t.delete, cancel: t.cancel },
+                                                    confirmProps: { color: 'red' },
+                                                    onConfirm: () => deletePrivacyProfile(profile.id),
+                                                });
                                             }}
                                         >
                                             <IconTrash size={16} />
@@ -590,7 +610,12 @@ export function SettingsPage() {
                                     mt={24}
                                     onClick={() => {
                                         navigator.clipboard.writeText(existingKeyString);
-                                        alert('Copied to clipboard');
+                                        notifications.show({
+                                            title: t.copied,
+                                            message: '',
+                                            color: 'green',
+                                            icon: <IconCheck size={16} />
+                                        });
                                     }}
                                 >
                                     <IconCopy size={20} />

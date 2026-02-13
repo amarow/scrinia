@@ -85,7 +85,14 @@ export const translations = {
     noProfile: "None (Full Access)",
     editApiKey: "Edit API Key",
     apiKey: "API Key",
-    anonymization: "Anonymization"
+    anonymization: "Anonymization",
+    delete: "Delete",
+    confirmTitle: "Confirm Action",
+    copied: "Copied to clipboard",
+    deleteScopeTitle: "Delete Source",
+    deleteKeyTitle: "Delete API Key",
+    deleteProfileTitle: "Delete Anonymization Profile",
+    areYouSure: "Are you sure you want to proceed?"
   },
   de: {
     searchPlaceholder: "Dateien suchen...",
@@ -173,6 +180,13 @@ export const translations = {
     noProfile: "Keines (Vollzugriff)",
     editApiKey: "API Key bearbeiten",
     apiKey: "API Key",
-    anonymization: "Anonymisierung"
+    anonymization: "Anonymisierung",
+    delete: "Löschen",
+    confirmTitle: "Aktion bestätigen",
+    copied: "In die Zwischenablage kopiert",
+    deleteScopeTitle: "Quelle löschen",
+    deleteKeyTitle: "API Key löschen",
+    deleteProfileTitle: "Anonymisierungsprofil löschen",
+    areYouSure: "Sind Sie sicher, dass Sie fortfahren möchten?"
   }
 };

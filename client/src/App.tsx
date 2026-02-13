@@ -10,6 +10,8 @@ import { HomePage } from './pages/Home';
 import { SettingsPage } from './pages/Settings';
 import { translations } from './i18n';
 import { TagzillaLogo } from './components/Logo';
+import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 
 const TAG_COLORS = [
     '#fa5252', // Red
@@ -99,12 +101,20 @@ export default function App() {
   const handleDeleteTag = async (e: React.MouseEvent, tag: any) => {
     e.stopPropagation();
     const fileCount = tag._count?.files || 0;
-    if (fileCount > 0) {
-        if (!window.confirm(t.deleteTagConfirm.replace('{count}', fileCount.toString()))) {
-            return;
-        }
-    }
-    await deleteTag(tag.id);
+    
+    modals.openConfirmModal({
+        title: t.deleteTag,
+        children: (
+            <Text size="sm">
+                {fileCount > 0 
+                    ? t.deleteTagConfirm.replace('{count}', fileCount.toString())
+                    : t.areYouSure}
+            </Text>
+        ),
+        labels: { confirm: t.delete, cancel: t.cancel },
+        confirmProps: { color: 'red' },
+        onConfirm: () => deleteTag(tag.id),
+    });
   };
 
   const handleDragStart = (event: any) => {

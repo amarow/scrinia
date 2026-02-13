@@ -1,7 +1,10 @@
 import { StrictMode, Component } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import { MantineProvider, createTheme } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
+import { ModalsProvider } from '@mantine/modals';
 import App from './App.tsx'
 
 // Define the "Apple-like" palette
@@ -62,11 +65,14 @@ import { BrowserRouter } from 'react-router-dom';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider theme={theme} defaultColorScheme="auto">
-      <ErrorBoundary>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ErrorBoundary>
+      <ModalsProvider>
+        <Notifications position="top-right" zIndex={2000} />
+        <ErrorBoundary>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ErrorBoundary>
+      </ModalsProvider>
     </MantineProvider>
   </StrictMode>,
 )
