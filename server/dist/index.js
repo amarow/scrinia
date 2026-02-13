@@ -46,6 +46,8 @@ const auth_1 = require("./auth");
 const fs = __importStar(require("fs/promises"));
 const path = __importStar(require("path"));
 const os_1 = __importDefault(require("os"));
+const adm_zip_1 = __importDefault(require("adm-zip"));
+const heic_convert_1 = __importDefault(require("heic-convert"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
 console.log("!!! SERVER STARTUP - ASYNC CRAWLER VERSION " + Date.now() + " !!!");
@@ -122,6 +124,24 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+app.post('/api/user/password', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword)
+            return res.status(400).json({ error: 'Missing password fields' });
+        await auth_1.authService.changePassword(userId, currentPassword, newPassword);
+        res.json({ success: true });
+    }
+    catch (e) {
+        if (e.message === 'Invalid current password') {
+            res.status(401).json({ error: e.message });
+        }
+        else {
+            res.status(500).json({ error: e.message });
+        }
+    }
+});
 // --- Protected Routes ---
 app.get('/status', auth_1.authenticateToken, async (req, res) => {
     try {
@@ -175,6 +195,7 @@ app.post('/api/scopes', auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+const user_1 = require("./db/user");
 app.post('/api/scopes/:id/refresh', auth_1.authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -185,9 +206,15 @@ app.post('/api/scopes/:id/refresh', auth_1.authenticateToken, async (req, res) =
             res.status(403).json({ error: 'Access denied' });
             return;
         }
-        // Trigger scan in background (Fire and Forget)
+        // 1. Ensure system tags exist for this user (just in case)
+        (0, user_1.ensureSystemTags)(userId);
+        // 2. Trigger background scan (Fire and Forget)
         console.log(`[API] Triggering background scan for scope ${id}`);
-        crawler_1.crawlerService.scanScope(scope.id, scope.path).catch(err => {
+        crawler_1.crawlerService.scanScope(scope.id, scope.path).then(async () => {
+            // 3. After scan (or during), ensure files are tagged correctly
+            // This applies system tags to ALL files, which is what we want for "repair"
+            await repository_1.fileRepository.applySystemTagsToAllFiles();
+        }).catch(err => {
             console.error(`[API] Background scan failed for scope ${scope.id}:`, err);
         });
         res.json({ success: true, message: 'Scan started in background' });
@@ -226,7 +253,7 @@ app.get('/api/files/:id/content', auth_1.authenticateToken, async (req, res) => 
         const userId = req.user.id;
         const { id } = req.params;
         const sql = `
-            SELECT f.path, f.mimeType 
+            SELECT f.path, f.mimeType, f.extension 
             FROM FileHandle f 
             JOIN Scope s ON f.scopeId = s.id 
             WHERE f.id = ? AND s.userId = ?
@@ -235,6 +262,24 @@ app.get('/api/files/:id/content', auth_1.authenticateToken, async (req, res) => 
         if (!file) {
             res.status(404).json({ error: 'File not found or access denied' });
             return;
+        }
+        // HEIC/HEIF Conversion to JPEG
+        if (file.extension.toLowerCase() === '.heic' || file.extension.toLowerCase() === '.heif') {
+            try {
+                const inputBuffer = await fs.readFile(file.path);
+                const outputBuffer = await (0, heic_convert_1.default)({
+                    buffer: inputBuffer,
+                    format: 'JPEG',
+                    quality: 0.8
+                });
+                res.setHeader('Content-Type', 'image/jpeg');
+                res.send(Buffer.from(outputBuffer));
+                return;
+            }
+            catch (err) {
+                console.error(`Failed to convert HEIC: ${err}`);
+                // Fallback to sending original file if conversion fails
+            }
         }
         // Optional: Set Content-Type header explicitly if needed, though sendFile usually handles it.
         // res.setHeader('Content-Type', file.mimeType);
@@ -247,6 +292,90 @@ app.get('/api/files/:id/content', auth_1.authenticateToken, async (req, res) => 
         });
     }
     catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/files/:id/zip-content', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { id } = req.params;
+        const sql = `
+            SELECT f.path 
+            FROM FileHandle f 
+            JOIN Scope s ON f.scopeId = s.id 
+            WHERE f.id = ? AND s.userId = ?
+        `;
+        const file = client_1.db.prepare(sql).get(id, userId);
+        if (!file) {
+            res.status(404).json({ error: 'File not found or access denied' });
+            return;
+        }
+        const zip = new adm_zip_1.default(file.path);
+        const zipEntries = zip.getEntries();
+        const entries = zipEntries
+            .filter(entry => !entry.isDirectory)
+            .map(entry => ({
+            name: entry.entryName,
+            size: entry.header.size,
+            compressedSize: entry.header.compressedSize,
+            isDirectory: entry.isDirectory,
+            path: entry.entryName,
+            method: entry.header.method
+        }));
+        res.json(entries);
+    }
+    catch (e) {
+        console.error("ZIP Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/files/:id/zip-entry', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { id } = req.params;
+        const entryPath = req.query.path;
+        if (!entryPath) {
+            res.status(400).json({ error: 'Entry path is required' });
+            return;
+        }
+        const sql = `
+            SELECT f.path 
+            FROM FileHandle f 
+            JOIN Scope s ON f.scopeId = s.id 
+            WHERE f.id = ? AND s.userId = ?
+        `;
+        const file = client_1.db.prepare(sql).get(id, userId);
+        if (!file) {
+            res.status(404).json({ error: 'File not found or access denied' });
+            return;
+        }
+        const zip = new adm_zip_1.default(file.path);
+        const entry = zip.getEntry(entryPath);
+        if (!entry) {
+            res.status(404).json({ error: 'Entry not found in zip' });
+            return;
+        }
+        if (entry.isDirectory) {
+            res.status(400).json({ error: 'Cannot download a directory' });
+            return;
+        }
+        const buffer = entry.getData();
+        // Try to detect mime type simply by extension
+        const ext = path.extname(entry.entryName).toLowerCase();
+        let contentType = 'application/octet-stream';
+        if (['.txt', '.md', '.json', '.js', '.ts', '.css', '.html', '.xml'].includes(ext))
+            contentType = 'text/plain';
+        if (['.jpg', '.jpeg'].includes(ext))
+            contentType = 'image/jpeg';
+        if (['.png'].includes(ext))
+            contentType = 'image/png';
+        if (['.pdf'].includes(ext))
+            contentType = 'application/pdf';
+        res.setHeader('Content-Type', contentType);
+        res.send(buffer);
+    }
+    catch (e) {
+        console.error("ZIP Entry Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -354,6 +483,22 @@ app.post('/api/files/bulk-tags', auth_1.authenticateToken, async (req, res) => {
     }
     catch (e) {
         console.error(`[API] Bulk tag failed:`, e);
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/files/bulk-tags', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { fileIds, tagId } = req.body;
+        if (!fileIds || !Array.isArray(fileIds) || !tagId) {
+            res.status(400).json({ error: 'Invalid payload' });
+            return;
+        }
+        const result = await repository_1.fileRepository.removeTagFromFiles(userId, fileIds, Number(tagId));
+        res.json(result);
+    }
+    catch (e) {
+        console.error(`[API] Bulk tag remove failed:`, e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -472,5 +617,7 @@ app.put('/api/settings/search', auth_1.authenticateToken, async (req, res) => {
 // Start Server & Crawler
 app.listen(PORT, async () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    // Run system tag update on startup (fire and forget or await)
+    await repository_1.fileRepository.applySystemTagsToAllFiles();
     await crawler_1.crawlerService.init();
 });

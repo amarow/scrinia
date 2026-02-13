@@ -8,6 +8,7 @@ const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const worker_threads_1 = require("worker_threads");
+const user_1 = require("./user");
 // Ensure the directory exists and use absolute path
 let dbPath = process.env.DATABASE_URL?.replace('file:', '') || './dev.db';
 if (!path_1.default.isAbsolute(dbPath)) {
@@ -44,6 +45,7 @@ if (worker_threads_1.isMainThread) {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         color TEXT,
+        isEditable BOOLEAN NOT NULL DEFAULT 1,
         userId INTEGER NOT NULL,
         FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
         UNIQUE(userId, name)
@@ -89,4 +91,12 @@ if (worker_threads_1.isMainThread) {
     `;
     exports.db.exec(schema);
     console.log(`Database initialized at ${dbPath}`);
+    // Migration: Add isEditable column if not exists
+    const tagColumns = exports.db.pragma('table_info(Tag)');
+    const hasIsEditable = tagColumns.some(col => col.name === 'isEditable');
+    if (!hasIsEditable) {
+        exports.db.prepare("ALTER TABLE Tag ADD COLUMN isEditable BOOLEAN NOT NULL DEFAULT 1").run();
+        console.log("Migration: Added 'isEditable' column to Tag table");
+    }
+    (0, user_1.createDefaultUserAndTags)();
 }

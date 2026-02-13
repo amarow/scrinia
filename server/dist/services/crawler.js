@@ -13,7 +13,7 @@ class CrawlerWorkerPool {
         this.workers = [];
         this.taskQueue = [];
         this.activeWorkers = 0;
-        this.maxWorkers = 4; // User requested 8 cores
+        this.maxWorkers = 8; // User requested 8 cores
         // Determine correct path and execution args based on environment (ts-node vs node)
         const isTsNode = __filename.endsWith('.ts');
         this.workerScript = isTsNode
@@ -175,6 +175,7 @@ exports.crawlerService = {
         let fileCount = 0;
         let ignoredCount = 0;
         let skippedCount = 0;
+        const foundFileIds = [];
         const startTime = Date.now();
         const queue = [{ path: directoryPath, depth: 0 }];
         // We keep track of pending worker tasks to know when the scan is fully complete
@@ -188,8 +189,11 @@ exports.crawlerService = {
                     setTimeout(processQueue, 100);
                     return;
                 }
+                // Prune files not found in this scan
+                console.log(`[CRAWLER] Pruning deleted files for scope ${scopeId}...`);
+                const deletedCount = await repository_1.fileRepository.pruneFiles(scopeId, foundFileIds);
                 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-                console.log(`[CRAWLER] Finished scan for scope ${scopeId}. Total: ${fileCount} files. Skipped (unchanged): ${skippedCount}. Ignored: ${ignoredCount} items. Time: ${duration}s.`);
+                console.log(`[CRAWLER] Finished scan for scope ${scopeId}. Total: ${fileCount} files. Skipped (unchanged): ${skippedCount}. Deleted: ${deletedCount}. Ignored: ${ignoredCount} items. Time: ${duration}s.`);
                 return;
             }
             const current = queue.shift();
@@ -220,6 +224,7 @@ exports.crawlerService = {
                             if (existing && existing.updatedAt === mtimeStr && existing.size === stats.size) {
                                 skippedCount++;
                                 fileCount++; // Still count as "processed" in total
+                                foundFileIds.push(existing.id);
                             }
                             else {
                                 const fileId = await repository_1.fileRepository.upsertFile(scopeId, fullPath, {
@@ -227,6 +232,7 @@ exports.crawlerService = {
                                     ctime: stats.ctime,
                                     mtime: stats.mtime
                                 });
+                                foundFileIds.push(fileId);
                                 const ext = path_1.default.extname(fullPath).toLowerCase();
                                 // Limit: 20MB for binary, 5MB for text
                                 const maxSize = (ext === '.pdf' || ext === '.docx') ? 20 * 1024 * 1024 : 5 * 1024 * 1024;

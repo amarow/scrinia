@@ -113,8 +113,17 @@ export const fileRepository = {
   },
   
   // Get all files for a specific user (through user's scopes)
-  async getAll(userId: number) {
+  async getAll(userId: number, allowedTagIds?: number[]) {
       // Need a JOIN to check scope ownership
+      let tagFilter = '';
+      const params: any[] = [userId];
+
+      if (allowedTagIds && allowedTagIds.length > 0) {
+          const placeholders = allowedTagIds.map(() => '?').join(',');
+          tagFilter = `AND f.id IN (SELECT A FROM _FileHandleToTag WHERE B IN (${placeholders}))`;
+          params.push(...allowedTagIds);
+      }
+
       const sql = `
         SELECT f.*, 
                json_group_array(json_object('id', t.id, 'name', t.name, 'color', t.color, 'isEditable', t.isEditable)) as tags_json
@@ -122,12 +131,12 @@ export const fileRepository = {
         JOIN Scope s ON f.scopeId = s.id
         LEFT JOIN _FileHandleToTag ft ON f.id = ft.A
         LEFT JOIN Tag t ON ft.B = t.id
-        WHERE s.userId = ?
+        WHERE s.userId = ? ${tagFilter}
         GROUP BY f.id
         ORDER BY f.updatedAt DESC
       `;
       const stmt = db.prepare(sql);
-      const rows = stmt.all(userId);
+      const rows = stmt.all(...params);
       
       // Parse the JSON tags (sqlite returns string)
       return rows.map((row: any) => ({
@@ -570,5 +579,46 @@ export const searchRepository = {
         ...row,
         tags: row.tags_json ? JSON.parse(row.tags_json).filter((t: any) => t.id !== null) : []
     }));
+  }
+};
+
+export const apiKeyRepository = {
+  async create(userId: number, name: string, key: string, permissions: string) {
+    const stmt = db.prepare('INSERT INTO ApiKey (userId, name, key, permissions) VALUES (?, ?, ?, ?)');
+    const info = stmt.run(userId, name, key, permissions);
+    return { 
+      id: Number(info.lastInsertRowid), 
+      userId, 
+      name, 
+      key, 
+      permissions: permissions.split(','), 
+      createdAt: new Date() 
+    };
+  },
+
+  async getAll(userId: number) {
+    const stmt = db.prepare('SELECT id, name, key, permissions, createdAt, lastUsedAt FROM ApiKey WHERE userId = ? ORDER BY createdAt DESC');
+    const rows = stmt.all(userId) as any[];
+    return rows.map(row => ({
+      ...row,
+      permissions: row.permissions ? row.permissions.split(',') : []
+    }));
+  },
+
+  async delete(userId: number, id: number) {
+    const stmt = db.prepare('DELETE FROM ApiKey WHERE id = ? AND userId = ?');
+    const info = stmt.run(id, userId);
+    return info.changes > 0;
+  },
+
+  async verify(key: string) {
+    const stmt = db.prepare('SELECT * FROM ApiKey WHERE key = ?');
+    const apiKey = stmt.get(key) as any;
+    if (apiKey) {
+      // Update lastUsedAt
+      db.prepare('UPDATE ApiKey SET lastUsedAt = CURRENT_TIMESTAMP WHERE id = ?').run(apiKey.id);
+      return apiKey;
+    }
+    return null;
   }
 };

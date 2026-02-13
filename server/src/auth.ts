@@ -1,8 +1,10 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db/client';
 import { ensureSystemTags } from './db/user';
+import { apiKeyRepository } from './db/repository';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'super-secret-key-change-me';
 
@@ -11,9 +13,18 @@ export interface AuthRequest extends Request {
     id: number;
     username: string;
   };
+  apiKey?: {
+    id: number;
+    name: string;
+    permissions: string[];
+  };
 }
 
 export const authService = {
+  generateApiKey() {
+    return `tz_${crypto.randomBytes(24).toString('hex')}`;
+  },
+
   async register(username: string, password: string) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const stmt = db.prepare('INSERT INTO User (username, password) VALUES (?, ?)');
@@ -65,6 +76,31 @@ export const authService = {
         throw new Error('Failed to update password in database');
     }
   }
+};
+
+export const authenticateApiKey = async (req: Request, res: Response, next: NextFunction) => {
+  let key = req.headers['x-api-key'] as string;
+  
+  if (!key) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      key = authHeader.substring(7);
+    }
+  }
+
+  if (!key) return res.status(401).json({ error: 'API key missing' });
+
+  const apiKeyRecord = await apiKeyRepository.verify(key);
+  if (!apiKeyRecord) return res.status(403).json({ error: 'Invalid API key' });
+
+  (req as AuthRequest).user = { id: apiKeyRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
+  (req as AuthRequest).apiKey = {
+    id: apiKeyRecord.id,
+    name: apiKeyRecord.name,
+    permissions: apiKeyRecord.permissions.split(',')
+  };
+  
+  next();
 };
 
 export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {

@@ -34,11 +34,21 @@ interface User {
   username: string;
 }
 
+interface ApiKey {
+  id: number;
+  name: string;
+  permissions: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  key?: string; // Only present when just created
+}
+
 interface AppState {
   // Auth
   token: string | null;
   user: User | null;
   isAuthenticated: boolean;
+  apiKeys: ApiKey[];
 
   // Data
   files: FileHandle[];
@@ -71,6 +81,11 @@ interface AppState {
   changePassword: (current: string, newP: string) => Promise<void>;
   logout: () => void;
   toggleLanguage: () => void;
+
+  // API Key Actions
+  fetchApiKeys: () => Promise<void>;
+  createApiKey: (name: string, permissions?: string) => Promise<ApiKey | null>;
+  deleteApiKey: (id: number) => Promise<void>;
 
   // Data Actions
   init: () => Promise<void>;
@@ -156,6 +171,7 @@ export const useAppStore = create<AppState>()(
       token: null,
       user: null,
       isAuthenticated: false,
+      apiKeys: [],
 
       files: [],
       scopes: [],
@@ -235,7 +251,54 @@ export const useAppStore = create<AppState>()(
       },
 
       logout: () => {
-          set({ token: null, user: null, isAuthenticated: false, files: [], scopes: [], tags: [], selectedFileIds: [] });
+          set({ token: null, user: null, isAuthenticated: false, files: [], scopes: [], tags: [], selectedFileIds: [], apiKeys: [] });
+      },
+
+      fetchApiKeys: async () => {
+        try {
+          const res = await authFetch(`${API_BASE}/api/keys`, get().token);
+          if (res.ok) {
+            const data = await res.json();
+            set({ apiKeys: data });
+          }
+        } catch (e) {
+          console.error("Failed to fetch api keys", e);
+        }
+      },
+
+      createApiKey: async (name, permissions) => {
+        set({ isLoading: true });
+        try {
+          const res = await authFetch(`${API_BASE}/api/keys`, get().token, {
+            method: 'POST',
+            body: JSON.stringify({ name, permissions })
+          });
+          if (res.ok) {
+            const newKey = await res.json();
+            await get().fetchApiKeys();
+            set({ isLoading: false });
+            return newKey;
+          }
+          set({ isLoading: false });
+          return null;
+        } catch (e) {
+          set({ isLoading: false });
+          console.error("Failed to create api key", e);
+          return null;
+        }
+      },
+
+      deleteApiKey: async (id) => {
+        try {
+          const res = await authFetch(`${API_BASE}/api/keys/${id}`, get().token, {
+            method: 'DELETE'
+          });
+          if (res.ok) {
+            await get().fetchApiKeys();
+          }
+        } catch (e) {
+          console.error("Failed to delete api key", e);
+        }
       },
 
       init: async () => {
@@ -268,7 +331,8 @@ export const useAppStore = create<AppState>()(
           await Promise.all([
               get().fetchFiles(),
               get().fetchScopes(),
-              get().fetchTags()
+              get().fetchTags(),
+              get().fetchApiKeys()
           ]);
       },
 

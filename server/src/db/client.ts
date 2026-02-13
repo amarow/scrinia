@@ -80,6 +80,17 @@ if (isMainThread) {
         FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS ApiKey (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        permissions TEXT NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        lastUsedAt DATETIME,
+        userId INTEGER NOT NULL,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      );
+
       CREATE VIRTUAL TABLE IF NOT EXISTS FileContentIndex USING fts5(
         content,
         tokenize='porter'

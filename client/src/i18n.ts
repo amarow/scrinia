@@ -55,7 +55,16 @@ export const translations = {
     appearance: "Appearance",
     currentPassword: "Current Password",
     newPassword: "New Password",
-    update: "Update"
+    update: "Update",
+    apiKeys: "API Keys",
+    apiKeysDesc: "Manage personal access tokens for external API access.",
+    createKey: "Create API Key",
+    keyName: "Key Name",
+    permissions: "Permissions (comma separated)",
+    keyCreated: "API Key created! Please copy it now, it won't be shown again:",
+    lastUsed: "Last used",
+    never: "Never",
+    copy: "Copy"
   },
   de: {
     searchPlaceholder: "Dateien suchen...",
@@ -113,6 +122,15 @@ export const translations = {
     appearance: "Erscheinungsbild",
     currentPassword: "Aktuelles Passwort",
     newPassword: "Neues Passwort",
-    update: "Aktualisieren"
+    update: "Aktualisieren",
+    apiKeys: "API Keys",
+    apiKeysDesc: "Verwalte persönliche Zugriffstoken für externen API-Zugriff.",
+    createKey: "API Key erstellen",
+    keyName: "Name des Keys",
+    permissions: "Berechtigungen (kommagetrennt)",
+    keyCreated: "API Key erstellt! Bitte jetzt kopieren, er wird nicht erneut angezeigt:",
+    lastUsed: "Zuletzt benutzt",
+    never: "Nie",
+    copy: "Kopieren"
   }
 };

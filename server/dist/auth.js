@@ -7,13 +7,17 @@ exports.authenticateToken = exports.authService = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const client_1 = require("./db/client");
+const user_1 = require("./db/user");
 const SECRET_KEY = process.env.JWT_SECRET || 'super-secret-key-change-me';
 exports.authService = {
     async register(username, password) {
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
         const stmt = client_1.db.prepare('INSERT INTO User (username, password) VALUES (?, ?)');
         const info = stmt.run(username, hashedPassword);
-        return { id: Number(info.lastInsertRowid), username };
+        const userId = Number(info.lastInsertRowid);
+        // Create system tags for new user
+        (0, user_1.ensureSystemTags)(userId);
+        return { id: userId, username };
     },
     async login(username, password) {
         const stmt = client_1.db.prepare('SELECT * FROM User WHERE username = ?');
@@ -25,6 +29,27 @@ exports.authService = {
             return null;
         const token = jsonwebtoken_1.default.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '7d' });
         return { token, user: { id: user.id, username: user.username } };
+    },
+    async changePassword(userId, currentPassword, newPassword) {
+        console.log(`[Auth] Attempting password change for user ${userId}`);
+        const stmt = client_1.db.prepare('SELECT * FROM User WHERE id = ?');
+        const user = stmt.get(userId);
+        if (!user) {
+            console.error(`[Auth] User ${userId} not found`);
+            throw new Error('User not found');
+        }
+        const valid = await bcryptjs_1.default.compare(currentPassword, user.password);
+        if (!valid) {
+            console.error(`[Auth] Invalid current password for user ${userId}`);
+            throw new Error('Invalid current password');
+        }
+        const hashedPassword = await bcryptjs_1.default.hash(newPassword, 10);
+        const updateStmt = client_1.db.prepare('UPDATE User SET password = ? WHERE id = ?');
+        const info = updateStmt.run(hashedPassword, userId);
+        console.log(`[Auth] Password updated for user ${userId}. Changes: ${info.changes}`);
+        if (info.changes === 0) {
+            throw new Error('Failed to update password in database');
+        }
     }
 };
 const authenticateToken = (req, res, next) => {

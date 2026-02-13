@@ -1,11 +1,11 @@
 import { 
     Title, Container, Button, Group, Text, Card, Stack, 
     ActionIcon, ScrollArea, Modal, TextInput, Loader, Checkbox,
-    useMantineColorScheme, SegmentedControl, PasswordInput
+    useMantineColorScheme, SegmentedControl, PasswordInput, MultiSelect
 } from '@mantine/core';
 import { 
     IconFolder, IconPlus, IconRefresh, IconTrash, IconArrowUp, IconCheck,
-    IconSunHigh, IconMoonStars, IconArrowLeft
+    IconSunHigh, IconMoonStars, IconArrowLeft, IconKey, IconCopy, IconEye, IconEyeOff
 } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
@@ -16,7 +16,8 @@ export function SettingsPage() {
     const { 
         scopes, addScope, refreshScope, deleteScope, token, 
         activeScopeIds, toggleScopeActive, language, user,
-        changePassword, isLoading
+        changePassword, isLoading, tags,
+        apiKeys, fetchApiKeys, createApiKey, deleteApiKey
     } = useAppStore();
 
     const t = translations[language];
@@ -27,11 +28,22 @@ export function SettingsPage() {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
 
+    // API Key State
+    const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+    const [newKeyName, setNewKeyName] = useState('');
+    const [selectedTagsForKey, setSelectedTagsForKey] = useState<string[]>([]);
+    const [createdKey, setCreatedKey] = useState<string | null>(null);
+    const [revealedKeyIds, setRevealedKeyIds] = useState<number[]>([]);
+
     // Directory Browser State
     const [isBrowserOpen, setIsBrowserOpen] = useState(false);
     const [browserPath, setBrowserPath] = useState('');
     const [browserEntries, setBrowserEntries] = useState<any[]>([]);
     const [isBrowserLoading, setIsBrowserLoading] = useState(false);
+
+    useEffect(() => {
+        fetchApiKeys();
+    }, []);
 
     // Escape Key Listener
     useEffect(() => {
@@ -223,6 +235,165 @@ export function SettingsPage() {
                 </Stack>
                 </form>
             </Card>
+
+            <Title order={3} mt="xl" mb="md">{t.apiKeys}</Title>
+            <Card withBorder shadow="sm" radius="md">
+                <Card.Section withBorder inheritPadding py="xs">
+                    <Group justify="space-between">
+                        <Stack gap={0}>
+                            <Text fw={500}>{t.apiKeys}</Text>
+                            <Text size="xs" c="dimmed">{t.apiKeysDesc}</Text>
+                        </Stack>
+                        <Button 
+                            leftSection={<IconPlus size={16} />} 
+                            variant="light" 
+                            size="xs" 
+                            onClick={() => {
+                                setCreatedKey(null);
+                                setNewKeyName('');
+                                setSelectedTagsForKey([]);
+                                setIsKeyModalOpen(true);
+                            }}
+                        >
+                            {t.createKey}
+                        </Button>
+                    </Group>
+                </Card.Section>
+
+                <Stack gap="xs" mt="md">
+                    {apiKeys.length === 0 && (
+                        <Text c="dimmed" ta="center" py="md">No API keys created yet.</Text>
+                    )}
+                    
+                    {apiKeys.map(key => (
+                        <Group key={key.id} justify="space-between" p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: '4px' }}>
+                            <Stack gap={4} style={{ flex: 1 }}>
+                                <Group justify="space-between">
+                                    <Group gap="xs">
+                                        <IconKey size={20} color="gray" />
+                                        <Text size="sm" fw={500}>{key.name}</Text>
+                                    </Group>
+                                    <Group gap={4}>
+                                        <Text size="xs" family="monospace" c="dimmed">
+                                            {revealedKeyIds.includes(key.id) ? key.key : '••••••••••••••••••••'}
+                                        </Text>
+                                        <ActionIcon 
+                                            size="sm" 
+                                            variant="subtle" 
+                                            onClick={() => {
+                                                setRevealedKeyIds(prev => 
+                                                    prev.includes(key.id) ? prev.filter(id => id !== key.id) : [...prev, key.id]
+                                                );
+                                            }}
+                                        >
+                                            {revealedKeyIds.includes(key.id) ? <IconEyeOff size={14} /> : <IconEye size={14} />}
+                                        </ActionIcon>
+                                        <ActionIcon 
+                                            size="sm" 
+                                            variant="subtle" 
+                                            onClick={() => {
+                                                if (key.key) {
+                                                    navigator.clipboard.writeText(key.key);
+                                                    alert('Key copied');
+                                                }
+                                            }}
+                                        >
+                                            <IconCopy size={14} />
+                                        </ActionIcon>
+                                    </Group>
+                                </Group>
+                                <Group gap="xs">
+                                    <Text size="xs" c="dimmed">
+                                        {t.lastUsed}: {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : t.never}
+                                    </Text>
+                                    <Text size="xs" c="dimmed" style={{ borderLeft: '1px solid gray', paddingLeft: '8px' }}>
+                                        {key.permissions.map(p => {
+                                            if (p.startsWith('tag:')) {
+                                                const id = parseInt(p.split(':')[1]);
+                                                const tag = tags.find(t => t.id === id);
+                                                return tag ? tag.name : p;
+                                            }
+                                            return p;
+                                        }).join(', ')}
+                                    </Text>
+                                </Group>
+                            </Stack>
+                            <ActionIcon 
+                                variant="light" 
+                                color="red"
+                                onClick={() => { 
+                                    if(confirm('Delete this API key?')) deleteApiKey(key.id); 
+                                }}
+                            >
+                                <IconTrash size={16} />
+                            </ActionIcon>
+                        </Group>
+                    ))}
+                </Stack>
+            </Card>
+
+            <Modal 
+                opened={isKeyModalOpen} 
+                onClose={() => setIsKeyModalOpen(false)} 
+                title={t.createKey}
+            >
+                <Stack>
+                    {!createdKey ? (
+                        <>
+                            <TextInput 
+                                label={t.keyName} 
+                                placeholder="e.g. Home Automation"
+                                value={newKeyName}
+                                onChange={(e) => setNewKeyName(e.currentTarget.value)}
+                                autoFocus
+                            />
+                            <MultiSelect 
+                                label={t.tags}
+                                placeholder="Select tags this key can access"
+                                data={tags.map(t => ({ value: String(t.id), label: t.name }))}
+                                value={selectedTagsForKey}
+                                onChange={setSelectedTagsForKey}
+                            />
+                            <Button 
+                                onClick={async () => {
+                                    const perms = selectedTagsForKey.length > 0 
+                                        ? selectedTagsForKey.map(id => `tag:${id}`).join(',')
+                                        : 'files:read,tags:read';
+                                    const key = await createApiKey(newKeyName, perms);
+                                    if (key) setCreatedKey(key.key || null);
+                                }}
+                                disabled={!newKeyName}
+                                loading={isLoading}
+                            >
+                                {t.createKey}
+                            </Button>
+                        </>
+                    ) : (
+                        <Stack>
+                            <Text size="sm" c="green" fw={500}>{t.keyCreated}</Text>
+                            <Group gap="xs">
+                                <TextInput 
+                                    value={createdKey} 
+                                    readOnly 
+                                    style={{ flex: 1 }}
+                                    styles={{ input: { fontFamily: 'monospace' } }}
+                                />
+                                <ActionIcon 
+                                    size="lg" 
+                                    variant="light"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(createdKey);
+                                        alert('Copied to clipboard');
+                                    }}
+                                >
+                                    <IconCopy size={20} />
+                                </ActionIcon>
+                            </Group>
+                            <Button onClick={() => setIsKeyModalOpen(false)}>{t.save}</Button>
+                        </Stack>
+                    )}
+                </Stack>
+            </Modal>
 
             <Modal 
                 opened={isBrowserOpen} 
