@@ -1,38 +1,52 @@
 # Entwicklungsplan: Tagzilla Modern
 
 ## Übergeordnetes Ziel
-- eine Art Dokumenten Managenet System
-- es sollen zunächst Dokumente vom eigenen Rechner eingelesen werden können
-- anstatt einer hierarchischen Ordnerstruktur soll ein Tagging-System eingesetzt werden
-- Die Dateiinhalte sollen zumindest angezeigt werden
-- für spezielle Formate könnte man auch spezielle Tools öffnen (Word,Excel, ...)
-- es sollen mehrere Quellverzeichnisse verwaltet werden können (Scopes)
+- Modernes Dokumenten-Management-System (DMS) für lokale Dateien.
+- Tag-basiertes System anstelle von hierarchischen Ordnerstrukturen.
+- Integrierte Dateivorschau für gängige Formate (Text, PDF, Office, Bilder).
+- Unterstützung für externe Viewer (systemweites Öffnen von Dateien).
+- Verwaltung mehrerer Quellverzeichnisse (Scopes).
 
+## Aktueller Status (Februar 2026)
 
-## Backend (Node.js/Express)
-- node.js + express + Typescript
-- crawler Funktion liest bestimmte Files (Filter notwendig)
-- Die FileHandles (Referenzen auf die echten Files) und Tags zu den Files werden in der DB abgelegt
-- es können mehrere Tags zu einem File angefügt/entfernt werden
-- der Server soll überwachen (watch Mode) und Änderungen (Dateiname, Datum, Size) zum Client posten
-- der Server soll eine Index anlegen 
+### Backend (Node.js/Express) - IMPLEMENTIERT
+- **Technologie:** TypeScript, Express 5.
+- **Crawler:** Scannt Scopes, erkennt Dateiänderungen (Größe, Datum) und verwaltet FileHandles in der DB.
+- **Datenbank:** SQLite via `better-sqlite3`. Schema umfasst `FileHandle`, `Tag`, `Scope`, `User`, `PrivacyProfile`, `ApiKey`.
+- **Authentifizierung:** JWT-basiert für die UI, API-Keys für externe Tools.
+- **Features:** 
+    - Full-Text-Search (FTS5) Vorbereitung.
+    - Dokumenten-Extraktion (.docx via mammoth, .odt via zip/xml, .heic Konvertierung via sharp/heic-convert).
+    - ZIP-Browser (Anzeige und Extraktion einzelner Dateien aus Archiven).
+    - Datenschutz: Schwärzung (Redaction) sensibler Daten in der Textvorschau via Privacy-Regeln.
+    - System-Integration: Öffnen von Dateien mit Standard-Apps (Linux: `xdg-open`/`gio`, Win/Mac Support).
 
-## Frontend (React/Vite)
-- Typescript
-- schlanken Techstack, React-Router, Zustand
-- Browser, Smartphone, Tablet, Responsive
-- schlanke Komponeten-lib Mantine
-- Dark+Light Mode
-- Die UI besteht aus drei Teilen Header (oben), Tags-Area (links) und File-List (rechts) 
-- Der User arangiert seine Tags in der Tags-Area wie er möchte, 
-- beim Selektieren eines Tags wird die File-List aktualisiert 
-- im Header werden globale Daten angezeigt User, Scope, Filter
-- Die aktuelle ansicht wird im UserStae persistiert und überlebt einen Browser Neustart
+### Frontend (React/Vite) - IMPLEMENTIERT
+- **Technologie:** TypeScript, Vite, React 19.
+- **UI-Library:** Mantine v8 (Dark/Light Mode ready).
+- **State-Management:** Zustand (persistiert AppState).
+- **Features:**
+    - Dreigeteiltes Layout: Header (Suche/User), Tags-Area (links), File-List (rechts).
+    - Drag & Drop: Dateien auf Tags ziehen oder Tags auf Dateien ziehen (dnd-kit).
+    - Lokalisierung (i18n): Deutsch/Englisch Support.
+    - Responsive Design für Desktop und Tablet.
 
+## Nächste Schritte & Offene Punkte
 
-## Datenbank SQLite
-- nur wenige Entitäten : FileHandle, Tag, Scope, Filter, User, UserState
-- einfaches DB-Schema, oder JSON-Blobs
+### Kurzfristig (Prio 1)
+- [ ] **FTS-Optimierung:** Sicherstellen, dass der Index bei Änderungen am Dateisystem zuverlässig aktualisiert wird.
+- [ ] **Vorschau-Erweiterung:** PDF-Rendering im Browser verbessern (aktuell oft Download oder externer Viewer).
+- [ ] **UI Polishing:** Performance bei sehr großen Dateilisten (Virtual Scrolling ist bereits vorbereitet via `@tanstack/react-virtual`).
 
-## Infrastruktur / Sonstiges
-- soll nur lokal laufen
+### Mittelfristig (Prio 2)
+- [ ] **Automatische Verschlagwortung:** Einfache KI-gestützte oder Regel-basierte Tag-Vorschläge basierend auf Dateiinhalten.
+- [ ] **Erweiterte Filter:** Kombinationen von Tags (AND/OR/NOT) in der UI intuitiver gestalten.
+- [ ] **Export/Backup:** Export der Datenbank und der Tag-Zuordnungen als JSON/CSV.
+
+### Langfristig (Prio 3)
+- [ ] **Multi-User Collaboration:** Teilen von Scopes zwischen Benutzern (aktuell stark auf lokalen Einzelnutzer fokussiert).
+- [ ] **Plugin-System:** Eigene Parser für exotische Dateiformate.
+
+## Infrastruktur
+- Nur lokaler Betrieb (Self-Hosted).
+- Start via `start.sh` (Server + Client).
