@@ -159,8 +159,40 @@ export const authenticateApiKey = async (req: Request, res: Response, next: Next
 
       next();
 
-    });
+        });
 
-  };
+      };
+
+    
+
+    export const authenticateAny = (req: Request, res: Response, next: NextFunction) => {
+
+      const authHeader = req.headers['authorization'];
+
+      const apiKeyHeader = req.headers['x-api-key'];
+
+      
+
+      if (apiKeyHeader || (authHeader && authHeader.startsWith('Bearer '))) {
+
+        const token = authHeader && authHeader.split(' ')[1];
+
+        // Simple check: if it has 3 parts separated by dots, it's likely a JWT
+
+        if (token && token.split('.').length === 3) {
+
+            return authenticateToken(req, res, next);
+
+        }
+
+        return authenticateApiKey(req, res, next);
+
+      }
+
+      return authenticateToken(req, res, next);
+
+    };
+
+    
 
   

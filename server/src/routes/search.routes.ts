@@ -1,24 +1,9 @@
 import { Router } from 'express';
-import { authenticateToken, AuthRequest } from '../auth';
-import { searchRepository } from '../db/repository';
+import { authenticateToken } from '../auth';
+import { SearchController } from '../controllers/SearchController';
 
 const router = Router();
 
-router.get('/', authenticateToken, async (req, res) => {
-    try {
-        const userId = (req as AuthRequest).user!.id;
-        const { filename, content, directory } = req.query as { filename?: string, content?: string, directory?: string };
-        
-        if (!filename && !content && !directory) {
-            res.json([]); 
-            return;
-        }
-        
-        const results = await searchRepository.search(userId, { filename, content, directory });
-        res.json(results);
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-});
+router.get('/', authenticateToken, SearchController.search);
 
 export default router;
