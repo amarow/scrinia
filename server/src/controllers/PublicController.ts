@@ -39,8 +39,20 @@ export const PublicController = {
     async search(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
+            const apiKey = (req as AuthRequest).apiKey;
             const { filename, content, directory } = req.query as { filename?: string, content?: string, directory?: string };
-            const results = await searchRepository.search(userId, { filename, content, directory });
+            
+            let results = await searchRepository.search(userId, { filename, content, directory });
+            
+            if (apiKey && apiKey.privacyProfileId) {
+                results = await Promise.all(results.map(async (f: any) => {
+                    if (f.snippet) {
+                        f.snippet = await privacyService.redactText(f.snippet, apiKey.privacyProfileId!);
+                    }
+                    return f;
+                }));
+            }
+
             res.json(results);
         } catch (e: any) {
             res.status(500).json({ error: e.message });

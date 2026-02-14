@@ -1,25 +1,53 @@
 import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, Stack } from '@mantine/core';
 import { useAppStore } from '../store';
 import { useEffect, useState } from 'react';
-import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder } from '@tabler/icons-react';
+import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconShieldLock, IconEye } from '@tabler/icons-react';
 import { FileViewer } from './FileViewer';
 import { translations } from '../i18n';
+import { authFetch, API_BASE } from '../store/utils';
 
 export function FilePreviewPanel() {
     const { 
         previewFileId, setPreviewFileId, files, searchResults, 
-        token, openFile, openDirectory, language 
+        token, openFile, openDirectory, language,
+        privacyProfiles, fetchPrivacyProfiles
     } = useAppStore();
     const t = translations[language];
     const [zipContent, setZipContent] = useState<any[] | null>(null);
     const [selectedZipEntry, setSelectedZipEntry] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [exportView, setExportView] = useState(false);
+    const [redactedText, setRedactedText] = useState<string | null>(null);
 
     // Look up file in files list OR search results
     const file = files.find(f => f.id === previewFileId) || searchResults.find(f => f.id === previewFileId);
 
-    const API_BASE = 'http://localhost:3001';
+    useEffect(() => {
+        if (privacyProfiles.length === 0 && token) {
+            fetchPrivacyProfiles();
+        }
+    }, [token]);
+
+    // Fetch redacted text when exportView is enabled
+    useEffect(() => {
+        if (exportView && file && token) {
+            const profileId = privacyProfiles[0]?.id;
+            if (!profileId) return;
+
+            setLoading(true);
+            authFetch(`${API_BASE}/api/files/${file.id}/text-content?profileId=${profileId}`, token)
+                .then(res => res.text())
+                .then(text => {
+                    setRedactedText(text);
+                    setLoading(false);
+                })
+                .catch(err => {
+                    setError(err.message);
+                    setLoading(false);
+                });
+        }
+    }, [exportView, file, token, privacyProfiles]);
 
     // Handle Escape key to close preview
     useEffect(() => {
@@ -153,6 +181,18 @@ export function FilePreviewPanel() {
                 </Group>
                 <Group>
                     <Button 
+                        leftSection={exportView ? <IconEye size={16} /> : <IconShieldLock size={16} />} 
+                        variant="light" 
+                        size="xs"
+                        color={exportView ? "blue" : "orange"}
+                        onClick={() => {
+                            setExportView(!exportView);
+                            setRedactedText(null);
+                        }}
+                    >
+                        {exportView ? t.standardPreview : t.exportPreview}
+                    </Button>
+                    <Button 
                         leftSection={<IconFolder size={16} />} 
                         variant="light" 
                         size="xs"
@@ -188,7 +228,22 @@ export function FilePreviewPanel() {
 
                 {!loading && !error && (
                     <>
-                        {isZip && zipContent ? (
+                        {exportView ? (
+                            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                {privacyProfiles.length > 0 ? (
+                                    <Paper withBorder p="md" style={{ flex: 1, overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px' }}>
+                                        <Text size="xs" c="dimmed" mb="md" fw={700}>
+                                            PROFIL: {privacyProfiles[0].name}
+                                        </Text>
+                                        {redactedText}
+                                    </Paper>
+                                ) : (
+                                    <Center h="100%">
+                                        <Text c="dimmed">{t.noPrivacyProfile}</Text>
+                                    </Center>
+                                )}
+                            </div>
+                        ) : isZip && zipContent ? (
                             <div style={{ overflow: 'auto', maxHeight: '100%' }}>
                                 <Table striped highlightOnHover>
                                     <Table.Thead>

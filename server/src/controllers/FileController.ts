@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { AuthRequest } from '../auth';
 import { fileService } from '../services/file.service';
+import { privacyService } from '../services/privacy';
 
 export const FileController = {
     async getAll(req: Request, res: Response) {
@@ -21,12 +22,19 @@ export const FileController = {
         try {
             const userId = (req as AuthRequest).user!.id;
             const { id } = req.params;
+            const { profileId } = req.query;
+
             const sql = `SELECT f.path, f.extension FROM FileHandle f JOIN Scope s ON f.scopeId = s.id WHERE f.id = ? AND s.userId = ?`;
             const file = db.prepare(sql).get(id, userId) as { path: string, extension: string };
             
             if (!file) return res.status(404).json({ error: 'File not found' });
 
-            const text = await fileService.extractText(file.path, file.extension);
+            let text = await fileService.extractText(file.path, file.extension);
+            
+            if (profileId) {
+                text = await privacyService.redactText(text, Number(profileId));
+            }
+
             res.setHeader('Content-Type', 'text/plain');
             res.send(text);
         } catch (e: any) {
