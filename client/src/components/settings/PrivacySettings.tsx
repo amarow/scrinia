@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Title, Card, Group, Stack, Text, Button, ActionIcon, Table, Switch, Modal, TextInput, Select, Paper, Center } from '@mantine/core';
-import { IconPlus, IconShieldLock, IconSettings, IconTrash, IconCheck, IconCopy } from '@tabler/icons-react';
+import { Title, Card, Group, Stack, Text, Button, ActionIcon, Table, Switch, Modal, TextInput, Select } from '@mantine/core';
+import { IconPlus, IconShieldLock, IconSettings, IconTrash, IconCopy } from '@tabler/icons-react';
 import { useAppStore } from '../../store';
 import { translations } from '../../i18n';
 import { modals } from '@mantine/modals';
@@ -8,8 +8,7 @@ import { modals } from '@mantine/modals';
 export const PrivacySettings = () => {
   const { 
     privacyProfiles, createPrivacyProfile, deletePrivacyProfile, updatePrivacyProfile,
-    fetchPrivacyRules, addPrivacyRule, deletePrivacyRule, updatePrivacyRule,
-    language, isLoading 
+    fetchPrivacyRules, language, isLoading 
   } = useAppStore();
   const t = translations[language];
 
@@ -18,34 +17,40 @@ export const PrivacySettings = () => {
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [rules, setRules] = useState<any[]>([]);
 
-  const refreshRules = async (profileId: number) => {
-      const r = await fetchPrivacyRules(profileId);
-      setRules(r);
+  const handleUpdateRuleLocal = (id: string | number, updates: any) => {
+      setRules(prev => prev.map(r => (r.id === id || r.tempId === id) ? { ...r, ...updates } : r));
   };
 
-  const handleUpdateRule = async (id: number, updates: any) => {
-      await updatePrivacyRule(id, updates);
-      if (activeProfileId) refreshRules(activeProfileId);
-  };
-
-  const handleAddEmptyRule = async () => {
-      if (!activeProfileId) return;
-      await addPrivacyRule(activeProfileId, {
+  const handleAddEmptyRuleLocal = () => {
+      setRules(prev => [...prev, {
+          tempId: Date.now(),
           type: 'LITERAL',
           pattern: '',
-          replacement: '[REDACTED]'
-      });
-      refreshRules(activeProfileId);
+          replacement: '[REDACTED]',
+          isActive: true
+      }]);
   };
 
-  const handleCloneRule = async (rule: any) => {
-      if (!activeProfileId) return;
-      await addPrivacyRule(activeProfileId, {
-          type: rule.type,
-          pattern: `${rule.pattern} (Copy)`,
-          replacement: rule.replacement
-      });
-      refreshRules(activeProfileId);
+  const handleCloneRuleLocal = (rule: any) => {
+      setRules(prev => [...prev, {
+          ...rule,
+          id: undefined,
+          tempId: Date.now(),
+          pattern: `${rule.pattern} (Copy)`
+      }]);
+  };
+
+  const handleRemoveRuleLocal = (id: string | number) => {
+      setRules(prev => prev.filter(r => r.id !== id && r.tempId !== id));
+  };
+
+  const handleSave = async () => {
+      if (activeProfileId) {
+          await updatePrivacyProfile(activeProfileId, activeProfileName, rules);
+      } else {
+          await createPrivacyProfile(activeProfileName, rules);
+      }
+      setIsRulesModalOpen(false);
   };
 
   return (
@@ -64,7 +69,7 @@ export const PrivacySettings = () => {
                       size="xs" 
                       onClick={() => {
                           setActiveProfileId(null);
-                          setActiveProfileName('');
+                          setActiveProfileName(t.createProfile);
                           setRules([]);
                           setIsRulesModalOpen(true);
                       }}
@@ -89,6 +94,21 @@ export const PrivacySettings = () => {
                           </div>
                       </Group>
                       <Group gap="xs">
+                          <ActionIcon 
+                              variant="light" 
+                              color="blue"
+                              onClick={async () => {
+                                  const r = await fetchPrivacyRules(profile.id);
+                                  // Clean rules for cloning (remove IDs so they are treated as new)
+                                  const clonedRules = r.map(rule => ({ ...rule, id: undefined, tempId: Date.now() + Math.random() }));
+                                  setRules(clonedRules);
+                                  setActiveProfileId(null); // It's a new profile
+                                  setActiveProfileName(`${profile.name} (Copy)`);
+                                  setIsRulesModalOpen(true);
+                              }}
+                          >
+                              <IconCopy size={16} />
+                          </ActionIcon>
                           <ActionIcon 
                               variant="light" 
                               onClick={async () => {
@@ -129,160 +149,121 @@ export const PrivacySettings = () => {
           size="xl"
       >
           <Stack>
-              <Group align="flex-end">
-                  <TextInput 
-                      label={t.profileName}
-                      placeholder="e.g. My Privacy Rules"
-                      value={activeProfileName}
-                      onChange={(e) => setActiveProfileName(e.currentTarget.value)}
-                      style={{ flex: 1 }}
-                      autoFocus={!activeProfileId}
-                  />
+              <TextInput 
+                  label={t.profileName}
+                  placeholder="e.g. My Privacy Rules"
+                  value={activeProfileName}
+                  onChange={(e) => setActiveProfileName(e.currentTarget.value)}
+              />
+
+              <Group justify="space-between" align="center" mt="md">
+                  <Text fw={500} size="sm">{t.rules}</Text>
                   <Button 
-                      variant="light"
-                      onClick={async () => {
-                          if (activeProfileId) {
-                              await updatePrivacyProfile(activeProfileId, activeProfileName);
-                          } else if (activeProfileName.trim()) {
-                              const newProfile = await createPrivacyProfile(activeProfileName.trim());
-                              if (newProfile) {
-                                  setActiveProfileId(newProfile.id);
-                                  setActiveProfileName(newProfile.name);
-                              }
-                          }
-                      }}
-                      disabled={!activeProfileName.trim()}
-                      loading={isLoading}
+                      size="xs" 
+                      variant="light" 
+                      leftSection={<IconPlus size={14} />}
+                      onClick={handleAddEmptyRuleLocal}
                   >
-                      <IconCheck size={16} />
+                      {t.add}
                   </Button>
               </Group>
 
-              {activeProfileId ? (
-                  <>
-                      <Group justify="space-between" align="center" mt="md">
-                          <Text fw={500} size="sm">{t.rules}</Text>
-                          <Button 
-                              size="xs" 
-                              variant="light" 
-                              leftSection={<IconPlus size={14} />}
-                              onClick={handleAddEmptyRule}
-                              loading={isLoading}
-                          >
-                              {t.add}
-                          </Button>
-                      </Group>
-
-                      <Table striped highlightOnHover withTableBorder mt="xs">
-                          <thead>
-                              <tr>
-                                  <th style={{ width: 120, textAlign: 'left' }}>{t.type}</th>
-                                  <th style={{ textAlign: 'left' }}>{t.pattern}</th>
-                                  <th style={{ width: 150, textAlign: 'left' }}>{t.replacement}</th>
-                                  <th style={{ width: 60, textAlign: 'left' }}>{t.active}</th>
-                                  <th style={{ width: 90 }}></th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              {rules.map(rule => (
-                                  <tr key={rule.id}>
-                                      <td>
-                                          <Select 
-                                              size="xs"
-                                              variant="unstyled"
-                                              data={[
-                                                  { value: 'LITERAL', label: t.literal },
-                                                  { value: 'REGEX', label: t.regex },
-                                                  { value: 'EMAIL', label: t.email },
-                                                  { value: 'IBAN', label: t.iban },
-                                                  { value: 'IPV4', label: t.ipv4 },
-                                                  { value: 'PHONE', label: t.phone }
-                                              ]}
-                                              value={rule.type}
-                                              onChange={(val) => handleUpdateRule(rule.id, { type: val })}
-                                          />
-                                      </td>
-                                      <td>
-                                          <TextInput 
-                                              size="xs"
-                                              variant="unstyled"
-                                              value={rule.pattern}
-                                              placeholder={rule.type === 'LITERAL' || rule.type === 'REGEX' ? t.pattern : '---'}
-                                              disabled={rule.type !== 'LITERAL' && rule.type !== 'REGEX'}
-                                              onChange={(e) => {
-                                                  const newPattern = e.currentTarget.value;
-                                                  const newRules = rules.map(r => r.id === rule.id ? { ...r, pattern: newPattern } : r);
-                                                  setRules(newRules);
-                                              }}
-                                              onBlur={(e) => handleUpdateRule(rule.id, { pattern: e.currentTarget.value })}
-                                              styles={{ input: { fontFamily: 'monospace' } }}
-                                          />
-                                      </td>
-                                      <td>
-                                          <TextInput 
-                                              size="xs"
-                                              variant="unstyled"
-                                              value={rule.replacement}
-                                              placeholder={t.replacement}
-                                              onChange={(e) => {
-                                                  const newRepl = e.currentTarget.value;
-                                                  const newRules = rules.map(r => r.id === rule.id ? { ...r, replacement: newRepl } : r);
-                                                  setRules(newRules);
-                                              }}
-                                              onBlur={(e) => handleUpdateRule(rule.id, { replacement: e.currentTarget.value })}
-                                          />
-                                      </td>
-                                      <td style={{ textAlign: 'left' }}>
-                                          <Switch 
-                                              checked={!!rule.isActive}
-                                              onChange={async (e) => {
-                                                  await handleUpdateRule(rule.id, { isActive: e.currentTarget.checked });
-                                              }}
-                                              size="xs"
-                                          />
-                                      </td>
-                                      <td>
-                                          <Group gap={4} wrap="nowrap">
-                                              <ActionIcon 
-                                                  variant="subtle" 
-                                                  color="blue" 
-                                                  size="sm"
-                                                  onClick={() => handleCloneRule(rule)}
-                                              >
-                                                  <IconCopy size={14} />
-                                              </ActionIcon>
-                                              <ActionIcon 
-                                                  variant="subtle" 
-                                                  color="red" 
-                                                  size="sm"
-                                                  onClick={async () => {
-                                                      await deletePrivacyRule(rule.id);
-                                                      refreshRules(activeProfileId);
-                                                  }}
-                                              >
-                                                  <IconTrash size={14} />
-                                              </ActionIcon>
-                                          </Group>
-                                      </td>
-                                  </tr>
-                              ))}
-                              {rules.length === 0 && (
-                                  <tr>
-                                      <td colSpan={5}>
-                                          <Text size="xs" c="dimmed" ta="center" py="sm">No rules defined yet.</Text>
-                                      </td>
-                                  </tr>
-                              )}
-                          </tbody>
-                      </Table>
-                  </>
-              ) : (
-                  <Paper withBorder p="md" style={{ borderStyle: 'dashed', opacity: 0.6 }}>
-                      <Center>
-                          <Text size="sm" c="dimmed">{t.rules} {t.never}</Text>
-                      </Center>
-                  </Paper>
-              )}
+              <Table striped highlightOnHover withTableBorder mt="xs">
+                  <thead>
+                      <tr>
+                          <th style={{ width: 120, textAlign: 'left' }}>{t.type}</th>
+                          <th style={{ textAlign: 'left' }}>{t.pattern}</th>
+                          <th style={{ width: 150, textAlign: 'left' }}>{t.replacement}</th>
+                          <th style={{ width: 60, textAlign: 'left' }}>{t.active}</th>
+                          <th style={{ width: 90 }}></th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {rules.map((rule, idx) => (
+                          <tr key={rule.id || rule.tempId || idx}>
+                              <td>
+                                  <Select 
+                                      size="xs"
+                                      variant="unstyled"
+                                      data={[
+                                          { value: 'LITERAL', label: t.literal },
+                                          { value: 'REGEX', label: t.regex },
+                                          { value: 'EMAIL', label: t.email },
+                                          { value: 'IBAN', label: t.iban },
+                                          { value: 'IPV4', label: t.ipv4 },
+                                          { value: 'PHONE', label: t.phone }
+                                      ]}
+                                      value={rule.type}
+                                      onChange={(val) => handleUpdateRuleLocal(rule.id || rule.tempId, { type: val })}
+                                  />
+                              </td>
+                              <td>
+                                  <TextInput 
+                                      size="xs"
+                                      variant="unstyled"
+                                      value={rule.pattern}
+                                      placeholder={rule.type === 'LITERAL' || rule.type === 'REGEX' ? t.pattern : '---'}
+                                      disabled={rule.type !== 'LITERAL' && rule.type !== 'REGEX'}
+                                      onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { pattern: e.currentTarget.value })}
+                                      styles={{ input: { fontFamily: 'monospace' } }}
+                                  />
+                              </td>
+                              <td>
+                                  <TextInput 
+                                      size="xs"
+                                      variant="unstyled"
+                                      value={rule.replacement}
+                                      placeholder={t.replacement}
+                                      onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { replacement: e.currentTarget.value })}
+                                  />
+                              </td>
+                              <td style={{ textAlign: 'left' }}>
+                                  <Switch 
+                                      checked={!!rule.isActive}
+                                      onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { isActive: e.currentTarget.checked })}
+                                      size="xs"
+                                  />
+                              </td>
+                              <td>
+                                  <Group gap={4} wrap="nowrap">
+                                      <ActionIcon 
+                                          variant="subtle" 
+                                          color="blue" 
+                                          size="sm"
+                                          onClick={() => handleCloneRuleLocal(rule)}
+                                      >
+                                          <IconCopy size={14} />
+                                      </ActionIcon>
+                                      <ActionIcon 
+                                          variant="subtle" 
+                                          color="red" 
+                                          size="sm"
+                                          onClick={() => handleRemoveRuleLocal(rule.id || rule.tempId)}
+                                      >
+                                          <IconTrash size={14} />
+                                      </ActionIcon>
+                                  </Group>
+                              </td>
+                          </tr>
+                      ))}
+                      {rules.length === 0 && (
+                          <tr>
+                              <td colSpan={5}>
+                                  <Text size="xs" c="dimmed" ta="center" py="sm">No rules defined yet.</Text>
+                              </td>
+                          </tr>
+                      )}
+                  </tbody>
+              </Table>
+              
+              <Button 
+                  mt="xl" 
+                  onClick={handleSave} 
+                  loading={isLoading}
+                  disabled={!activeProfileName.trim()}
+              >
+                  {t.save}
+              </Button>
           </Stack>
       </Modal>
     </>

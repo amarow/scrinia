@@ -9,7 +9,7 @@ import { notifications } from '@mantine/notifications';
 export const ApiKeySettings = () => {
   const { 
     apiKeys, fetchApiKeys, createApiKey, deleteApiKey, updateApiKey, 
-    tags, privacyProfiles, language, isLoading 
+    generateApiKeyString, tags, privacyProfiles, language, isLoading 
   } = useAppStore();
   const t = translations[language];
 
@@ -23,6 +23,24 @@ export const ApiKeySettings = () => {
   useEffect(() => {
     fetchApiKeys();
   }, []);
+
+  const handleSave = async () => {
+      const perms = selectedTagsForKey.length > 0 
+          ? selectedTagsForKey.map(id => `tag:${id}`).join(',')
+          : 'files:read,tags:read';
+      const profileIds = selectedPrivacyProfiles.map(id => parseInt(id));
+      
+      if (editingKeyId) {
+          await updateApiKey(editingKeyId, { 
+              name: newKeyName, 
+              permissions: perms as any, 
+              privacyProfileIds: profileIds 
+          });
+      } else {
+          await createApiKey(newKeyName, perms, profileIds, existingKeyString || undefined);
+      }
+      setIsKeyModalOpen(false);
+  };
 
   return (
     <>
@@ -38,14 +56,16 @@ export const ApiKeySettings = () => {
                       leftSection={<IconPlus size={16} />} 
                       variant="light" 
                       size="xs" 
-                      onClick={() => {
+                      onClick={async () => {
+                          const preGeneratedKey = await generateApiKeyString();
                           setEditingKeyId(null);
-                          setNewKeyName('');
+                          setNewKeyName(t.keyName);
                           setSelectedTagsForKey([]);
                           setSelectedPrivacyProfiles([]);
-                          setExistingKeyString(null);
+                          setExistingKeyString(preGeneratedKey);
                           setIsKeyModalOpen(true);
                       }}
+                      loading={isLoading}
                   >
                       {t.add}
                   </Button>
@@ -95,6 +115,21 @@ export const ApiKeySettings = () => {
                       <Group gap="xs">
                           <ActionIcon 
                               variant="light" 
+                              color="blue"
+                              onClick={async () => {
+                                  const preGeneratedKey = await generateApiKeyString();
+                                  setEditingKeyId(null);
+                                  setNewKeyName(`${key.name} (Copy)`);
+                                  setSelectedTagsForKey(key.permissions.filter(p => p.startsWith('tag:')).map(p => p.split(':')[1]));
+                                  setSelectedPrivacyProfiles(key.privacyProfileIds ? key.privacyProfileIds.map(String) : []);
+                                  setExistingKeyString(preGeneratedKey);
+                                  setIsKeyModalOpen(true);
+                              }}
+                          >
+                              <IconCopy size={16} />
+                          </ActionIcon>
+                          <ActionIcon 
+                              variant="light" 
                               onClick={() => {
                                   setEditingKeyId(key.id);
                                   setNewKeyName(key.name);
@@ -130,10 +165,10 @@ export const ApiKeySettings = () => {
       <Modal 
           opened={isKeyModalOpen} 
           onClose={() => setIsKeyModalOpen(false)} 
-          title={editingKeyId ? t.apiKey : t.createKey}
+          title={t.apiKey}
       >
           <Stack>
-              {editingKeyId && existingKeyString && (
+              {existingKeyString && (
                   <Group gap="xs">
                       <TextInput 
                           label="API Key"
@@ -182,23 +217,7 @@ export const ApiKeySettings = () => {
                   onChange={setSelectedPrivacyProfiles}
               />
               <Button 
-                  onClick={async () => {
-                      const perms = selectedTagsForKey.length > 0 
-                          ? selectedTagsForKey.map(id => `tag:${id}`).join(',')
-                          : 'files:read,tags:read';
-                      const profileIds = selectedPrivacyProfiles.map(id => parseInt(id));
-                      
-                      if (editingKeyId) {
-                          await updateApiKey(editingKeyId, { 
-                              name: newKeyName, 
-                              permissions: perms as any, 
-                              privacyProfileIds: profileIds 
-                          });
-                      } else {
-                          await createApiKey(newKeyName, perms, profileIds);
-                      }
-                      setIsKeyModalOpen(false);
-                  }}
+                  onClick={handleSave}
                   disabled={!newKeyName}
                   loading={isLoading}
               >

@@ -13,14 +13,23 @@ export const ApiKeyController = {
         }
     },
 
+    async generateKey(req: Request, res: Response) {
+        try {
+            const key = authService.generateApiKey();
+            res.json({ key });
+        } catch (e: any) {
+            res.status(500).json({ error: e.message });
+        }
+    },
+
     async create(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
-            const { name, permissions, privacyProfileIds } = req.body;
+            const { name, permissions, privacyProfileIds, key: providedKey } = req.body;
             if (!name) return res.status(400).json({ error: 'Name is required' });
             
             const permsString = Array.isArray(permissions) ? permissions.join(',') : (permissions || 'files:read,tags:read');
-            const key = authService.generateApiKey();
+            const key = providedKey || authService.generateApiKey();
             const newKey = await apiKeyRepository.create(userId, name, key, permsString, privacyProfileIds);
             res.json(newKey);
         } catch (e: any) {

@@ -5,6 +5,7 @@ const auth_1 = require("../auth");
 const ApiKeyController_1 = require("../controllers/ApiKeyController");
 const router = (0, express_1.Router)();
 router.get('/', auth_1.authenticateToken, ApiKeyController_1.ApiKeyController.getAll);
+router.get('/generate', auth_1.authenticateToken, ApiKeyController_1.ApiKeyController.generateKey);
 router.post('/', auth_1.authenticateToken, ApiKeyController_1.ApiKeyController.create);
 router.delete('/:id', auth_1.authenticateToken, ApiKeyController_1.ApiKeyController.delete);
 router.patch('/:id', auth_1.authenticateToken, ApiKeyController_1.ApiKeyController.update);

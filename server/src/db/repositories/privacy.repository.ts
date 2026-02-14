@@ -1,10 +1,21 @@
 import { db } from '../client';
 
 export const privacyRepository = {
-  async createProfile(userId: number, name: string) {
-    const stmt = db.prepare('INSERT INTO PrivacyProfile (userId, name) VALUES (?, ?)');
-    const info = stmt.run(userId, name);
-    return { id: Number(info.lastInsertRowid), userId, name };
+  async createProfile(userId: number, name: string, rules?: any[]) {
+    return db.transaction(() => {
+      const stmt = db.prepare('INSERT INTO PrivacyProfile (userId, name) VALUES (?, ?)');
+      const info = stmt.run(userId, name);
+      const profileId = Number(info.lastInsertRowid);
+
+      if (rules && rules.length > 0) {
+        const ruleStmt = db.prepare('INSERT INTO PrivacyRule (profileId, type, pattern, replacement, isActive) VALUES (?, ?, ?, ?, ?)');
+        for (const rule of rules) {
+          ruleStmt.run(profileId, rule.type, rule.pattern || '', rule.replacement, rule.isActive !== undefined ? (rule.isActive ? 1 : 0) : 1);
+        }
+      }
+
+      return { id: profileId, userId, name, ruleCount: rules ? rules.length : 0 };
+    })();
   },
 
   async getProfiles(userId: number) {
@@ -22,6 +33,27 @@ export const privacyRepository = {
     const stmt = db.prepare('DELETE FROM PrivacyProfile WHERE id = ? AND userId = ?');
     const info = stmt.run(id, userId);
     return info.changes > 0;
+  },
+
+  async updateProfile(userId: number, id: number, name: string, rules?: any[]) {
+    db.transaction(() => {
+      // Update name
+      const stmt = db.prepare('UPDATE PrivacyProfile SET name = ? WHERE id = ? AND userId = ?');
+      stmt.run(name, id, userId);
+
+      if (rules) {
+        // Sync rules: simplest way is to delete and re-insert
+        // Verify ownership
+        const profile = db.prepare('SELECT id FROM PrivacyProfile WHERE id = ? AND userId = ?').get(id, userId);
+        if (profile) {
+          db.prepare('DELETE FROM PrivacyRule WHERE profileId = ?').run(id);
+          const ruleStmt = db.prepare('INSERT INTO PrivacyRule (profileId, type, pattern, replacement, isActive) VALUES (?, ?, ?, ?, ?)');
+          for (const rule of rules) {
+            ruleStmt.run(id, rule.type, rule.pattern || '', rule.replacement, rule.isActive !== undefined ? (rule.isActive ? 1 : 0) : 1);
+          }
+        }
+      }
+    })();
   },
 
   async addRule(profileId: number, rule: { type: string, pattern: string, replacement: string }) {

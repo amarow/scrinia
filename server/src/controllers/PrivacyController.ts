@@ -17,9 +17,9 @@ export const PrivacyController = {
     async createProfile(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
-            const { name } = req.body;
+            const { name, rules } = req.body;
             if (!name) return res.status(400).json({ error: 'Name is required' });
-            const profile = await privacyRepository.createProfile(userId, name);
+            const profile = await privacyRepository.createProfile(userId, name, rules);
             res.json(profile);
         } catch (e: any) {
             res.status(500).json({ error: e.message });
@@ -41,11 +41,10 @@ export const PrivacyController = {
         try {
             const userId = (req as AuthRequest).user!.id;
             const { id } = req.params;
-            const { name } = req.body;
+            const { name, rules } = req.body;
             if (!name) return res.status(400).json({ error: 'Name is required' });
             
-            const stmt = db.prepare('UPDATE PrivacyProfile SET name = ? WHERE id = ? AND userId = ?');
-            stmt.run(name, id, userId);
+            await privacyRepository.updateProfile(userId, Number(id), name, rules);
             res.json({ success: true });
         } catch (e: any) {
             res.status(500).json({ error: e.message });

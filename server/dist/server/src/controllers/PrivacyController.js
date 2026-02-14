@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrivacyController = void 0;
 const repository_1 = require("../db/repository");
-const client_1 = require("../db/client");
 exports.PrivacyController = {
     async getProfiles(req, res) {
         try {
@@ -17,10 +16,10 @@ exports.PrivacyController = {
     async createProfile(req, res) {
         try {
             const userId = req.user.id;
-            const { name } = req.body;
+            const { name, rules } = req.body;
             if (!name)
                 return res.status(400).json({ error: 'Name is required' });
-            const profile = await repository_1.privacyRepository.createProfile(userId, name);
+            const profile = await repository_1.privacyRepository.createProfile(userId, name, rules);
             res.json(profile);
         }
         catch (e) {
@@ -42,11 +41,10 @@ exports.PrivacyController = {
         try {
             const userId = req.user.id;
             const { id } = req.params;
-            const { name } = req.body;
+            const { name, rules } = req.body;
             if (!name)
                 return res.status(400).json({ error: 'Name is required' });
-            const stmt = client_1.db.prepare('UPDATE PrivacyProfile SET name = ? WHERE id = ? AND userId = ?');
-            stmt.run(name, id, userId);
+            await repository_1.privacyRepository.updateProfile(userId, Number(id), name, rules);
             res.json({ success: true });
         }
         catch (e) {
