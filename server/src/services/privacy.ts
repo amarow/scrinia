@@ -18,7 +18,10 @@ export const privacyService = {
       try {
         let regex: RegExp;
         
-        if (rule.type === 'REGEX') {
+        // If it's a regex-based type and has a pattern, use the pattern
+        const isRegexBased = rule.type === 'REGEX' || !!PRESETS[rule.type];
+        
+        if (isRegexBased && rule.pattern) {
           regex = new RegExp(rule.pattern, 'gi');
         } else if (PRESETS[rule.type]) {
           regex = new RegExp(PRESETS[rule.type], 'gi');
@@ -26,8 +29,8 @@ export const privacyService = {
           const escapedPattern = rule.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           regex = new RegExp(escapedPattern, 'gi');
         } else {
-          // Fallback to literal if type is unknown but rule exists
-          const escapedPattern = rule.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Fallback
+          const escapedPattern = (rule.pattern || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           regex = new RegExp(escapedPattern, 'gi');
         }
 
@@ -59,12 +62,14 @@ export const privacyService = {
 
         try {
           let regex: RegExp;
-          if (rule.type === 'REGEX') {
+          const isRegexBased = rule.type === 'REGEX' || !!PRESETS[rule.type];
+
+          if (isRegexBased && rule.pattern) {
             regex = new RegExp(rule.pattern, 'gi');
           } else if (PRESETS[rule.type]) {
             regex = new RegExp(PRESETS[rule.type], 'gi');
           } else {
-            const escapedPattern = rule.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escapedPattern = (rule.pattern || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             regex = new RegExp(escapedPattern, 'gi');
           }
           result = result.replace(regex, rule.replacement);

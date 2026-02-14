@@ -5,6 +5,13 @@ import { useAppStore } from '../../store';
 import { translations } from '../../i18n';
 import { modals } from '@mantine/modals';
 
+const PRESETS: Record<string, string> = {
+    'EMAIL': '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
+    'IBAN': '[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}([A-Z0-9]?){0,16}',
+    'IPV4': '\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b',
+    'PHONE': '(?:\\+?49|0)(?:\\s*\\d{2,5}\\s*)(?:\\d{3,9})'
+};
+
 export const PrivacySettings = () => {
   const { 
     privacyProfiles, createPrivacyProfile, deletePrivacyProfile, updatePrivacyProfile,
@@ -194,7 +201,13 @@ export const PrivacySettings = () => {
                                           { value: 'PHONE', label: t.phone }
                                       ]}
                                       value={rule.type}
-                                      onChange={(val) => handleUpdateRuleLocal(rule.id || rule.tempId, { type: val })}
+                                      onChange={(val) => {
+                                          const updates: any = { type: val };
+                                          if (val && PRESETS[val] && !rule.pattern) {
+                                              updates.pattern = PRESETS[val];
+                                          }
+                                          handleUpdateRuleLocal(rule.id || rule.tempId, updates);
+                                      }}
                                   />
                               </td>
                               <td>
@@ -202,8 +215,7 @@ export const PrivacySettings = () => {
                                       size="xs"
                                       variant="unstyled"
                                       value={rule.pattern}
-                                      placeholder={rule.type === 'LITERAL' || rule.type === 'REGEX' ? t.pattern : '---'}
-                                      disabled={rule.type !== 'LITERAL' && rule.type !== 'REGEX'}
+                                      placeholder={t.pattern}
                                       onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { pattern: e.currentTarget.value })}
                                       styles={{ input: { fontFamily: 'monospace' } }}
                                   />
