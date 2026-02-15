@@ -50,7 +50,7 @@ export function FilePreviewPanel() {
                 ? apiKey.privacyProfileIds.map(id => `profileId=${id}`).join('&')
                 : '';
 
-            authFetch(`${API_BASE}/api/v1/files/${file.id}/text?${profilesQuery}`, token)
+            authFetch(`${API_BASE}/api/v1/files/${file.id}/text?format=html&${profilesQuery}`, token)
                 .then(async res => {
                     if (res.status === 403) return 'ACCESS DENIED (Tag mismatch for this API Key)';
                     return res.text();
@@ -273,7 +273,7 @@ export function FilePreviewPanel() {
                                                 </Group>
                                             </Paper>
                                         </Stack>
-                                        {redactedText}
+                                        <div dangerouslySetInnerHTML={{ __html: redactedText || '' }} />
                                     </Paper>
                                 ) : (
                                     <Center h="100%">

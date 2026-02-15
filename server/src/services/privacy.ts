@@ -7,10 +7,21 @@ const PRESETS: Record<string, string> = {
     'PHONE': '(?:\\+?49|0)(?:\\s*\\d{2,5}\\s*)(?:\\d{3,9})'
 };
 
+function escapeHtml(unsafe: string) {
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+const REDACTED_STYLE = 'color: #228be6; font-weight: bold; background: rgba(34, 139, 230, 0.1); padding: 0 2px; border-radius: 2px; border: 1px solid rgba(34, 139, 230, 0.2);';
+
 export const privacyService = {
-  async redactText(text: string, profileId: number): Promise<string> {
+  async redactText(text: string, profileId: number, asHtml: boolean = false): Promise<string> {
     const rules = await privacyRepository.getRules(profileId);
-    let redactedText = text;
+    let redactedText = asHtml ? escapeHtml(text) : text;
 
     for (const rule of rules as any[]) {
       if (!rule.isActive) continue;
@@ -34,7 +45,11 @@ export const privacyService = {
           regex = new RegExp(escapedPattern, 'gi');
         }
 
-        redactedText = redactedText.replace(regex, rule.replacement);
+        const replacement = asHtml 
+            ? `<span style="${REDACTED_STYLE}">${escapeHtml(rule.replacement)}</span>`
+            : rule.replacement;
+
+        redactedText = redactedText.replace(regex, replacement);
       } catch (e) {
         console.error(`[Privacy] Error applying rule ${rule.id}:`, e);
       }
@@ -43,17 +58,10 @@ export const privacyService = {
     return redactedText;
   },
 
-  async redactWithMultipleProfiles(text: string, profileIds: number[]): Promise<string> {
-    if (!profileIds || profileIds.length === 0) return text;
+  async redactWithMultipleProfiles(text: string, profileIds: number[], asHtml: boolean = false): Promise<string> {
+    if (!profileIds || profileIds.length === 0) return asHtml ? escapeHtml(text) : text;
 
-    // Fetch all rules for all profiles in one go if possible, or sequentially fetch rules only
-    // To keep it simple and maintain the order of profiles, we fetch rules for each profile.
-    // However, we apply all gathered rules sequentially on the same text.
-    let result = text;
-    
-    // gathering all rules first would be an option, but applying them directly is also fine 
-    // as long as we don't re-parse the whole document unnecessarily.
-    // Actually, String.replace in JS is already quite efficient.
+    let result = asHtml ? escapeHtml(text) : text;
     
     for (const profileId of profileIds) {
       const rules = await privacyRepository.getRules(profileId);
@@ -72,7 +80,12 @@ export const privacyService = {
             const escapedPattern = (rule.pattern || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             regex = new RegExp(escapedPattern, 'gi');
           }
-          result = result.replace(regex, rule.replacement);
+
+          const replacement = asHtml 
+            ? `<span style="${REDACTED_STYLE}">${escapeHtml(rule.replacement)}</span>`
+            : rule.replacement;
+
+          result = result.replace(regex, replacement);
         } catch (e) {
           console.error(`[Privacy] Error applying rule ${rule.id}:`, e);
         }

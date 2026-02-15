@@ -35,10 +35,10 @@ export const FileController = {
                 const profileIds = Array.isArray(profileId) 
                     ? profileId.map(id => Number(id)) 
                     : [Number(profileId)];
-                text = await privacyService.redactWithMultipleProfiles(text, profileIds);
+                text = await privacyService.redactWithMultipleProfiles(text, profileIds, true);
             }
 
-            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Type', 'text/html');
             res.send(text);
         } catch (e: any) {
             res.status(500).json({ error: e.message });

@@ -64,7 +64,8 @@ export const PublicController = {
             const userId = (req as AuthRequest).user!.id;
             const { id } = req.params;
             const apiKey = (req as AuthRequest).apiKey;
-            const { profileId } = req.query;
+            const { profileId, format } = req.query;
+            const asHtml = format === 'html';
             
             let allowedTagIds: number[] | undefined = undefined;
             if (apiKey) {
@@ -97,10 +98,13 @@ export const PublicController = {
             }
 
             if (profileIdsToApply.length > 0) {
-                text = await privacyService.redactWithMultipleProfiles(text, profileIdsToApply);
+                text = await privacyService.redactWithMultipleProfiles(text, profileIdsToApply, asHtml);
+            } else if (asHtml) {
+                // If HTML requested but no redaction, still escape it
+                text = await privacyService.redactWithMultipleProfiles(text, [], true);
             }
 
-            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Type', asHtml ? 'text/html' : 'text/plain');
             res.send(text);
         } catch (e: any) {
             res.status(500).json({ error: e.message });
