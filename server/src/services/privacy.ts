@@ -4,7 +4,7 @@ const PRESETS: Record<string, string> = {
     'EMAIL': '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
     'IBAN': '[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}([A-Z0-9]?){0,16}',
     'IPV4': '\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b',
-    'PHONE': '(?:\\+?49|0)(?:\\s*\\d{2,5}\\s*)(?:\\d{3,9})'
+    'PHONE': '(?:(?:phone|tel|mobile|mobil|telefon)\\s*[:\\-]?\\s*)(?:\\+?49|0)(?:\\s*\\d{2,5}\\s*)(?:\\d{3,9})'
 };
 
 function escapeHtml(unsafe: string) {
@@ -16,7 +16,29 @@ function escapeHtml(unsafe: string) {
          .replace(/'/g, "&#039;");
 }
 
-const REDACTED_STYLE = 'color: #228be6; font-weight: bold; background: rgba(34, 139, 230, 0.1); padding: 0 2px; border-radius: 2px; border: 1px solid rgba(34, 139, 230, 0.2);';
+const COLORS = [
+    '#228be6', // Blue
+    '#fa5252', // Red
+    '#be4bdb', // Grape
+    '#12b886', // Teal
+    '#fab005', // Yellow
+    '#fd7e14', // Orange
+    '#7950f2', // Violet
+    '#40c057', // Green
+    '#15aabf', // Cyan
+    '#e64980', // Pink
+    '#82c91e', // Lime
+    '#4c6ef5'  // Indigo
+];
+
+function getRuleColor(ruleId: number) {
+    const index = Math.abs(ruleId) % COLORS.length;
+    return COLORS[index];
+}
+
+function getRedactedStyle(color: string) {
+    return `color: ${color}; font-weight: bold; background: ${color}1A; padding: 0 2px; border-radius: 2px; border: 1px solid ${color}33; cursor: pointer;`;
+}
 
 export const privacyService = {
   async redactText(text: string, profileId: number, asHtml: boolean = false): Promise<string> {
@@ -45,8 +67,9 @@ export const privacyService = {
           regex = new RegExp(escapedPattern, 'gi');
         }
 
+        const color = getRuleColor(rule.id);
         const replacement = asHtml 
-            ? `<span style="${REDACTED_STYLE}">${escapeHtml(rule.replacement)}</span>`
+            ? `<span style="${getRedactedStyle(color)}" data-rule-id="${rule.id}" data-profile-id="${profileId}" class="redacted-text">${escapeHtml(rule.replacement)}</span>`
             : rule.replacement;
 
         redactedText = redactedText.replace(regex, replacement);
@@ -81,8 +104,9 @@ export const privacyService = {
             regex = new RegExp(escapedPattern, 'gi');
           }
 
+          const color = getRuleColor(rule.id);
           const replacement = asHtml 
-            ? `<span style="${REDACTED_STYLE}">${escapeHtml(rule.replacement)}</span>`
+            ? `<span style="${getRedactedStyle(color)}" data-rule-id="${rule.id}" data-profile-id="${profileId}" class="redacted-text">${escapeHtml(rule.replacement)}</span>`
             : rule.replacement;
 
           result = result.replace(regex, replacement);

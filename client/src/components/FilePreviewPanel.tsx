@@ -1,28 +1,171 @@
-import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, Stack, Select } from '@mantine/core';
+import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, Stack, Select, Badge, ActionIcon } from '@mantine/core';
 import { useAppStore } from '../store';
-import { useEffect, useState } from 'react';
-import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconShieldLock, IconEye } from '@tabler/icons-react';
+import { useEffect, useState, useCallback } from 'react';
+import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconShieldLock, IconEye, IconPlus, IconCopy } from '@tabler/icons-react';
 import { FileViewer } from './FileViewer';
 import { translations } from '../i18n';
 import { authFetch, API_BASE } from '../store/utils';
+import React, { useRef } from 'react';
+import { notifications } from '@mantine/notifications';
+
+// Memoized sub-component to prevent re-renders of the HTML content which would lose selection
+const RedactedContent = React.memo(({ html, onSelectionChange, onRedactedClick }: { 
+    html: string, 
+    onSelectionChange: (hasSel: boolean) => void,
+    onRedactedClick: (ruleId: number, profileId: number) => void 
+}) => {
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const node = ref.current;
+        if (!node) return;
+        
+        const handleMouseUp = () => {
+            const selection = window.getSelection();
+            const text = selection ? selection.toString().trim() : '';
+            if (text) {
+                (window as any)._currentScriniaSelection = text;
+                onSelectionChange(true);
+            } else {
+                onSelectionChange(false);
+            }
+        };
+
+        node.addEventListener('mouseup', handleMouseUp);
+        return () => node.removeEventListener('mouseup', handleMouseUp);
+    }, [onSelectionChange]);
+
+    const handleClick = (e: React.MouseEvent) => {
+        if (window.getSelection()?.toString().trim()) return;
+        const target = e.target as HTMLElement;
+        const span = target.closest('.redacted-text') as HTMLElement;
+        if (span) {
+            const ruleId = span.getAttribute('data-rule-id');
+            const profileId = span.getAttribute('data-profile-id');
+            if (ruleId && profileId) {
+                onRedactedClick(parseInt(ruleId), parseInt(profileId));
+            }
+        }
+    };
+
+    return (
+        <>
+            <div 
+                ref={ref}
+                style={{ cursor: 'text', userSelect: 'text', WebkitUserSelect: 'text', position: 'relative' }}
+                className="selectable-content"
+                onClick={handleClick}
+                dangerouslySetInnerHTML={{ __html: html }} 
+            />
+            <style>{`
+                .selectable-content::selection { background: rgba(34, 139, 230, 0.3); }
+                .selectable-content span::selection { background: rgba(34, 139, 230, 0.3); }
+            `}</style>
+        </>
+    );
+}, (prev, next) => prev.html === next.html);
 
 export function FilePreviewPanel() {
     const { 
         previewFileId, setPreviewFileId, files, searchResults, 
         token, openFile, openDirectory, language,
-        privacyProfiles, fetchPrivacyProfiles, apiKeys, fetchApiKeys
+        privacyProfiles, fetchPrivacyProfiles, apiKeys, fetchApiKeys,
+        setEditingRule, fetchPrivacyRules, setIsPrivacyModalOpen,
+        privacyRefreshCounter
     } = useAppStore();
     const t = translations[language];
     const [zipContent, setZipContent] = useState<any[] | null>(null);
     const [selectedZipEntry, setSelectedZipEntry] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [exportView, setExportView] = useState(false);
+    const [viewMode, setViewMode] = useState<'standard' | 'editor' | 'preview'>('standard');
     const [redactedText, setRedactedText] = useState<string | null>(null);
+    const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
     const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(null);
+    const [hasSelection, setHasSelection] = useState(false);
 
     // Look up file in files list OR search results
     const file = files.find(f => f.id === previewFileId) || searchResults.find(f => f.id === previewFileId);
+
+    // Set defaults
+    useEffect(() => {
+        if (privacyProfiles.length > 0 && !selectedProfileId) {
+            setSelectedProfileId(privacyProfiles[0].id.toString());
+        }
+        if (apiKeys.length > 0 && !selectedApiKeyId) {
+            setSelectedApiKeyId(apiKeys[0].id.toString());
+        }
+    }, [privacyProfiles, apiKeys]);
+
+    const handleAddRuleFromSelection = async () => {
+        const currentSelection = (window as any)._currentScriniaSelection;
+        
+        if (!currentSelection || !selectedProfileId) return;
+        
+        const profileId = parseInt(selectedProfileId);
+        const profile = privacyProfiles.find(p => p.id === profileId);
+        
+        if (!profile) return;
+
+        const existingRules = await fetchPrivacyRules(profileId);
+        const newRule = {
+            type: 'LITERAL' as const,
+            pattern: currentSelection,
+            replacement: '[REDACTED]',
+            isActive: true,
+            tempId: Date.now()
+        };
+
+        setEditingRule({
+            profileId,
+            initialRules: [...existingRules, newRule],
+            initialName: profile.name
+        });
+        setIsPrivacyModalOpen(true);
+        
+        setHasSelection(false);
+        (window as any)._currentScriniaSelection = '';
+        window.getSelection()?.removeAllRanges();
+    };
+
+    const fetchRedactedText = useCallback(() => {
+        if (viewMode === 'standard' || !file || !token) return;
+
+        setLoading(true);
+        let url = `${API_BASE}/api/v1/files/${file.id}/text?format=html`;
+
+        if (viewMode === 'editor' && selectedProfileId) {
+            url += `&profileId=${selectedProfileId}`;
+        } else if (viewMode === 'preview' && selectedApiKeyId) {
+            const apiKey = apiKeys.find(k => k.id.toString() === selectedApiKeyId);
+            if (apiKey && apiKey.privacyProfileIds?.length > 0) {
+                url += `&${apiKey.privacyProfileIds.map(id => `profileId=${id}`).join('&')}`;
+            }
+        }
+
+        authFetch(url, token)
+            .then(async res => {
+                if (res.status === 403) return 'ACCESS DENIED';
+                return res.text();
+            })
+            .then(text => {
+                setRedactedText(text);
+                setLoading(false);
+            })
+            .catch(err => {
+                setError(err.message);
+                setLoading(false);
+            });
+    }, [viewMode, file, token, selectedProfileId, selectedApiKeyId, apiKeys]);
+
+    const handleRedactedClick = useCallback((ruleId: number, profileId: number) => {
+        setEditingRule({ ruleId, profileId });
+        setIsPrivacyModalOpen(true);
+    }, [setEditingRule, setIsPrivacyModalOpen]);
+
+    const handleSelectionChange = useCallback((hasSel: boolean) => {
+        setHasSelection(hasSel);
+    }, []);
 
     useEffect(() => {
         if (token) {
@@ -31,40 +174,10 @@ export function FilePreviewPanel() {
         }
     }, [token]);
 
-    // Set default API key if none selected
+    // Fetch redacted text when viewMode, profile, API Key or refresh counter changes
     useEffect(() => {
-        if (apiKeys.length > 0 && !selectedApiKeyId) {
-            setSelectedApiKeyId(apiKeys[0].id.toString());
-        }
-    }, [apiKeys]);
-
-    // Fetch redacted text when exportView is enabled or API Key changes
-    useEffect(() => {
-        if (exportView && file && token && selectedApiKeyId) {
-            const apiKey = apiKeys.find(k => k.id.toString() === selectedApiKeyId);
-            if (!apiKey) return;
-
-            setLoading(true);
-            // Construct profileIds query string part: profileId=1&profileId=2...
-            const profilesQuery = apiKey.privacyProfileIds && apiKey.privacyProfileIds.length > 0
-                ? apiKey.privacyProfileIds.map(id => `profileId=${id}`).join('&')
-                : '';
-
-            authFetch(`${API_BASE}/api/v1/files/${file.id}/text?format=html&${profilesQuery}`, token)
-                .then(async res => {
-                    if (res.status === 403) return 'ACCESS DENIED (Tag mismatch for this API Key)';
-                    return res.text();
-                })
-                .then(text => {
-                    setRedactedText(text);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    setError(err.message);
-                    setLoading(false);
-                });
-        }
-    }, [exportView, file, token, selectedApiKeyId, apiKeys]);
+        fetchRedactedText();
+    }, [fetchRedactedText, privacyRefreshCounter, selectedProfileId, selectedApiKeyId, viewMode]);
 
     // Handle Escape key to close preview
     useEffect(() => {
@@ -197,28 +310,39 @@ export function FilePreviewPanel() {
                     </div>
                 </Group>
                 <Group>
-                    {exportView && apiKeys.length > 0 && (
-                        <Select
+                    <Group gap={5}>
+                        <Button 
+                            variant={viewMode === 'standard' ? "filled" : "subtle"} 
                             size="xs"
-                            placeholder={t.apiKey}
-                            data={apiKeys.map(k => ({ value: k.id.toString(), label: k.name }))}
-                            value={selectedApiKeyId}
-                            onChange={setSelectedApiKeyId}
-                            style={{ width: 180 }}
-                        />
-                    )}
-                    <Button 
-                        leftSection={exportView ? <IconEye size={16} /> : <IconShieldLock size={16} />} 
-                        variant="light" 
-                        size="xs"
-                        color={exportView ? "blue" : "orange"}
-                        onClick={() => {
-                            setExportView(!exportView);
-                            setRedactedText(null);
-                        }}
-                    >
-                        {exportView ? t.standardPreview : t.exportPreview}
-                    </Button>
+                            color={viewMode === 'standard' ? "blue" : "gray"}
+                            onClick={() => setViewMode('standard')}
+                        >
+                            Standard
+                        </Button>
+                        <Button 
+                            variant={viewMode === 'editor' ? "filled" : "subtle"} 
+                            size="xs"
+                            color={viewMode === 'editor' ? "blue" : "gray"}
+                            onClick={() => {
+                                setViewMode('editor');
+                                setRedactedText(null);
+                            }}
+                        >
+                            Rule Editor
+                        </Button>
+                        <Button 
+                            variant={viewMode === 'preview' ? "filled" : "subtle"} 
+                            size="xs"
+                            color={viewMode === 'preview' ? "blue" : "gray"}
+                            onClick={() => {
+                                setViewMode('preview');
+                                setRedactedText(null);
+                            }}
+                        >
+                            Export Preview
+                        </Button>
+                    </Group>
+
                     <Button 
                         leftSection={<IconFolder size={16} />} 
                         variant="light" 
@@ -255,31 +379,80 @@ export function FilePreviewPanel() {
 
                 {!loading && !error && (
                     <>
-                        {exportView ? (
+                        {viewMode !== 'standard' ? (
                             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                                {selectedApiKeyId ? (
-                                    <Paper withBorder p="md" style={{ flex: 1, overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px' }}>
-                                        <Stack gap="xs" mb="md">
-                                            <Text size="xs" c="dimmed" fw={700}>
-                                                API KEY: {apiKeys.find(k => k.id.toString() === selectedApiKeyId)?.name || 'Unknown'} 
-                                                ({apiKeys.find(k => k.id.toString() === selectedApiKeyId)?.privacyProfileIds.length || 0} PROFILES)
-                                            </Text>
-                                            <Paper withBorder p="xs" bg="var(--mantine-color-dark-8)" style={{ borderRadius: '4px' }}>
-                                                <Group gap="xs" wrap="nowrap">
-                                                    <Text size="xs" c="blue" fw={700} style={{ flexShrink: 0 }}>GET</Text>
-                                                    <Text size="xs" style={{ wordBreak: 'break-all', fontFamily: 'monospace' }}>
-                                                        {`${window.location.origin}/api/v1/files/${file.id}/text`}
-                                                    </Text>
-                                                </Group>
-                                            </Paper>
-                                        </Stack>
-                                        <div dangerouslySetInnerHTML={{ __html: redactedText || '' }} />
-                                    </Paper>
-                                ) : (
-                                    <Center h="100%">
-                                        <Text c="dimmed">{t.noPrivacyProfile}</Text>
-                                    </Center>
-                                )}
+                                <Paper withBorder p="md" style={{ flex: 1, overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px' }}>
+                                    <Stack gap="sm" mb="md">
+                                        <Group align="flex-end" gap="md">
+                                            {viewMode === 'editor' ? (
+                                                <>
+                                                    <Select
+                                                        label="Rule Set"
+                                                        size="xs"
+                                                        placeholder="Select rule set..."
+                                                        data={privacyProfiles.map(p => ({ value: p.id.toString(), label: p.name }))}
+                                                        value={selectedProfileId}
+                                                        onChange={setSelectedProfileId}
+                                                        style={{ width: 250 }}
+                                                    />
+                                                    <Button
+                                                        leftSection={<IconPlus size={16} />}
+                                                        variant="filled"
+                                                        size="xs"
+                                                        color="blue"
+                                                        disabled={!hasSelection}
+                                                        onClick={handleAddRuleFromSelection}
+                                                        style={{ marginBottom: '2px' }}
+                                                    >
+                                                        {t.add} Rule
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Select
+                                                        label="API Key"
+                                                        size="xs"
+                                                        placeholder={t.apiKey}
+                                                        data={apiKeys.map(k => ({ value: k.id.toString(), label: k.name }))}
+                                                        value={selectedApiKeyId}
+                                                        onChange={setSelectedApiKeyId}
+                                                        style={{ width: 250 }}
+                                                    />
+                                                    <Paper withBorder p="4px 8px" bg="var(--mantine-color-dark-8)" style={{ borderRadius: '4px', flex: 1, marginBottom: '2px' }}>
+                                                        <Group gap="xs" wrap="nowrap">
+                                                            <Text size="xs" c="blue" fw={700} style={{ flexShrink: 0 }}>GET</Text>
+                                                            <Text 
+                                                                size="xs" 
+                                                                component="a" 
+                                                                href={`${window.location.origin}/api/v1/files/${file.id}/text?apiKey=${apiKeys.find(k => k.id.toString() === selectedApiKeyId)?.key || 'YOUR_KEY'}`}
+                                                                target="_blank"
+                                                                style={{ wordBreak: 'break-all', fontFamily: 'monospace', textDecoration: 'none', color: 'inherit', cursor: 'pointer', flex: 1 }}
+                                                            >
+                                                                {`${window.location.origin}/api/v1/files/${file.id}/text?apiKey=...`}
+                                                            </Text>
+                                                            <ActionIcon 
+                                                                size="xs" 
+                                                                variant="subtle" 
+                                                                onClick={() => {
+                                                                    const url = `${window.location.origin}/api/v1/files/${file.id}/text?apiKey=${apiKeys.find(k => k.id.toString() === selectedApiKeyId)?.key || ''}`;
+                                                                    navigator.clipboard.writeText(url);
+                                                                    notifications.show({ message: 'URL copied to clipboard', color: 'blue', size: 'xs' });
+                                                                }}
+                                                            >
+                                                                <IconCopy size={14} />
+                                                            </ActionIcon>
+                                                        </Group>
+                                                    </Paper>
+                                                </>
+                                            )}
+                                        </Group>
+                                    </Stack>
+                                    <RedactedContent 
+                                        html={redactedText || ''} 
+                                        onSelectionChange={handleSelectionChange}
+                                        onRedactedClick={viewMode === 'editor' ? handleRedactedClick : () => {}}
+                                    />
+                                </Paper>
                             </div>
                         ) : isZip && zipContent ? (
                             <div style={{ overflow: 'auto', maxHeight: '100%' }}>

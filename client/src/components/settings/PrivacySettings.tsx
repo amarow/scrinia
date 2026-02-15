@@ -1,64 +1,16 @@
-import { useState } from 'react';
-import { Title, Card, Group, Stack, Text, Button, ActionIcon, Table, Switch, Modal, TextInput, Select } from '@mantine/core';
+import { Title, Card, Group, Stack, Text, Button, ActionIcon } from '@mantine/core';
 import { IconPlus, IconShieldLock, IconSettings, IconTrash, IconCopy } from '@tabler/icons-react';
 import { useAppStore } from '../../store';
 import { translations } from '../../i18n';
 import { modals } from '@mantine/modals';
-
-const PRESETS: Record<string, string> = {
-    'EMAIL': '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
-    'IBAN': '[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}([A-Z0-9]?){0,16}',
-    'IPV4': '\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b',
-    'PHONE': '(?:\\+?49|0)(?:\\s*\\d{2,5}\\s*)(?:\\d{3,9})'
-};
+import { PrivacyRulesModal } from './PrivacyRulesModal';
 
 export const PrivacySettings = () => {
   const { 
-    privacyProfiles, createPrivacyProfile, deletePrivacyProfile, updatePrivacyProfile,
-    fetchPrivacyRules, language, isLoading 
+    privacyProfiles, deletePrivacyProfile,
+    fetchPrivacyRules, language, setEditingRule, setIsPrivacyModalOpen
   } = useAppStore();
   const t = translations[language];
-
-  const [activeProfileId, setActiveProfileId] = useState<number | null>(null);
-  const [activeProfileName, setActiveProfileName] = useState('');
-  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
-  const [rules, setRules] = useState<any[]>([]);
-
-  const handleUpdateRuleLocal = (id: string | number, updates: any) => {
-      setRules(prev => prev.map(r => (r.id === id || r.tempId === id) ? { ...r, ...updates } : r));
-  };
-
-  const handleAddEmptyRuleLocal = () => {
-      setRules(prev => [...prev, {
-          tempId: Date.now(),
-          type: 'LITERAL',
-          pattern: '',
-          replacement: '[REDACTED]',
-          isActive: true
-      }]);
-  };
-
-  const handleCloneRuleLocal = (rule: any) => {
-      setRules(prev => [...prev, {
-          ...rule,
-          id: undefined,
-          tempId: Date.now(),
-          pattern: `${rule.pattern} (Copy)`
-      }]);
-  };
-
-  const handleRemoveRuleLocal = (id: string | number) => {
-      setRules(prev => prev.filter(r => r.id !== id && r.tempId !== id));
-  };
-
-  const handleSave = async () => {
-      if (activeProfileId) {
-          await updatePrivacyProfile(activeProfileId, activeProfileName, rules);
-      } else {
-          await createPrivacyProfile(activeProfileName, rules);
-      }
-      setIsRulesModalOpen(false);
-  };
 
   return (
     <>
@@ -75,10 +27,8 @@ export const PrivacySettings = () => {
                       variant="light" 
                       size="xs" 
                       onClick={() => {
-                          setActiveProfileId(null);
-                          setActiveProfileName(t.createProfile);
-                          setRules([]);
-                          setIsRulesModalOpen(true);
+                          setEditingRule({ isNew: true, initialName: t.createProfile, initialRules: [] });
+                          setIsPrivacyModalOpen(true);
                       }}
                   >
                       {t.add}
@@ -106,24 +56,22 @@ export const PrivacySettings = () => {
                               color="blue"
                               onClick={async () => {
                                   const r = await fetchPrivacyRules(profile.id);
-                                  // Clean rules for cloning (remove IDs so they are treated as new)
-                                  const clonedRules = r.map(rule => ({ ...rule, id: undefined, tempId: Date.now() + Math.random() }));
-                                  setRules(clonedRules);
-                                  setActiveProfileId(null); // It's a new profile
-                                  setActiveProfileName(`${profile.name} (Copy)`);
-                                  setIsRulesModalOpen(true);
+                                  const clonedRules = r.map((rule: any) => ({ ...rule, id: undefined, tempId: Date.now() + Math.random() }));
+                                  setEditingRule({ 
+                                      isNew: true, 
+                                      initialName: `${profile.name} (Copy)`, 
+                                      initialRules: clonedRules 
+                                  });
+                                  setIsPrivacyModalOpen(true);
                               }}
                           >
                               <IconCopy size={16} />
                           </ActionIcon>
                           <ActionIcon 
                               variant="light" 
-                              onClick={async () => {
-                                  const r = await fetchPrivacyRules(profile.id);
-                                  setRules(r);
-                                  setActiveProfileId(profile.id);
-                                  setActiveProfileName(profile.name);
-                                  setIsRulesModalOpen(true);
+                              onClick={() => {
+                                  setEditingRule({ profileId: profile.id });
+                                  setIsPrivacyModalOpen(true);
                               }}
                           >
                               <IconSettings size={16} />
@@ -149,135 +97,7 @@ export const PrivacySettings = () => {
           </Stack>
       </Card>
 
-      <Modal 
-          opened={isRulesModalOpen} 
-          onClose={() => setIsRulesModalOpen(false)} 
-          title={t.anonymization}
-          size="xl"
-      >
-          <Stack>
-              <TextInput 
-                  label={t.profileName}
-                  placeholder="e.g. My Privacy Rules"
-                  value={activeProfileName}
-                  onChange={(e) => setActiveProfileName(e.currentTarget.value)}
-              />
-
-              <Group justify="space-between" align="center" mt="md">
-                  <Text fw={500} size="sm">{t.rules}</Text>
-                  <Button 
-                      size="xs" 
-                      variant="light" 
-                      leftSection={<IconPlus size={14} />}
-                      onClick={handleAddEmptyRuleLocal}
-                  >
-                      {t.add}
-                  </Button>
-              </Group>
-
-              <Table striped highlightOnHover withTableBorder mt="xs">
-                  <thead>
-                      <tr>
-                          <th style={{ width: 120, textAlign: 'left' }}>{t.type}</th>
-                          <th style={{ textAlign: 'left' }}>{t.pattern}</th>
-                          <th style={{ width: 150, textAlign: 'left' }}>{t.replacement}</th>
-                          <th style={{ width: 60, textAlign: 'left' }}>{t.active}</th>
-                          <th style={{ width: 90 }}></th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {rules.map((rule, idx) => (
-                          <tr key={rule.id || rule.tempId || idx}>
-                              <td>
-                                  <Select 
-                                      size="xs"
-                                      variant="unstyled"
-                                      data={[
-                                          { value: 'LITERAL', label: t.literal },
-                                          { value: 'REGEX', label: t.regex },
-                                          { value: 'EMAIL', label: t.email },
-                                          { value: 'IBAN', label: t.iban },
-                                          { value: 'IPV4', label: t.ipv4 },
-                                          { value: 'PHONE', label: t.phone }
-                                      ]}
-                                      value={rule.type}
-                                      onChange={(val) => {
-                                          const updates: any = { type: val };
-                                          if (val && PRESETS[val] && !rule.pattern) {
-                                              updates.pattern = PRESETS[val];
-                                          }
-                                          handleUpdateRuleLocal(rule.id || rule.tempId, updates);
-                                      }}
-                                  />
-                              </td>
-                              <td>
-                                  <TextInput 
-                                      size="xs"
-                                      variant="unstyled"
-                                      value={rule.pattern}
-                                      placeholder={t.pattern}
-                                      onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { pattern: e.currentTarget.value })}
-                                      styles={{ input: { fontFamily: 'monospace' } }}
-                                  />
-                              </td>
-                              <td>
-                                  <TextInput 
-                                      size="xs"
-                                      variant="unstyled"
-                                      value={rule.replacement}
-                                      placeholder={t.replacement}
-                                      onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { replacement: e.currentTarget.value })}
-                                  />
-                              </td>
-                              <td style={{ textAlign: 'left' }}>
-                                  <Switch 
-                                      checked={!!rule.isActive}
-                                      onChange={(e) => handleUpdateRuleLocal(rule.id || rule.tempId, { isActive: e.currentTarget.checked })}
-                                      size="xs"
-                                  />
-                              </td>
-                              <td>
-                                  <Group gap={4} wrap="nowrap">
-                                      <ActionIcon 
-                                          variant="subtle" 
-                                          color="blue" 
-                                          size="sm"
-                                          onClick={() => handleCloneRuleLocal(rule)}
-                                      >
-                                          <IconCopy size={14} />
-                                      </ActionIcon>
-                                      <ActionIcon 
-                                          variant="subtle" 
-                                          color="red" 
-                                          size="sm"
-                                          onClick={() => handleRemoveRuleLocal(rule.id || rule.tempId)}
-                                      >
-                                          <IconTrash size={14} />
-                                      </ActionIcon>
-                                  </Group>
-                              </td>
-                          </tr>
-                      ))}
-                      {rules.length === 0 && (
-                          <tr>
-                              <td colSpan={5}>
-                                  <Text size="xs" c="dimmed" ta="center" py="sm">No rules defined yet.</Text>
-                              </td>
-                          </tr>
-                      )}
-                  </tbody>
-              </Table>
-              
-              <Button 
-                  mt="xl" 
-                  onClick={handleSave} 
-                  loading={isLoading}
-                  disabled={!activeProfileName.trim()}
-              >
-                  {t.save}
-              </Button>
-          </Stack>
-      </Modal>
+      <PrivacyRulesModal />
     </>
   );
 };

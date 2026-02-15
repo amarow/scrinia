@@ -9,6 +9,7 @@ import { SettingsPage } from './pages/Settings';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
+import { PrivacyRulesModal } from './components/settings/PrivacyRulesModal';
 
 export default function App() {
   const [opened, { toggle }] = useDisclosure();
@@ -93,6 +94,8 @@ export default function App() {
               <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </AppShell.Main>
+        
+        <PrivacyRulesModal />
 
         <DragOverlay>
           {activeDragItem ? (

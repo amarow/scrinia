@@ -5,6 +5,15 @@ import { API_BASE, authFetch } from '../utils';
 export interface SettingsSlice {
   apiKeys: ApiKey[];
   privacyProfiles: PrivacyProfile[];
+  editingRule: { 
+    ruleId?: number, 
+    profileId?: number, 
+    isNew?: boolean,
+    initialRules?: any[],
+    initialName?: string
+  } | null;
+  isPrivacyModalOpen: boolean;
+  privacyRefreshCounter: number;
   
   fetchApiKeys: () => Promise<void>;
   generateApiKeyString: () => Promise<string | null>;
@@ -20,6 +29,8 @@ export interface SettingsSlice {
   addPrivacyRule: (profileId: number, rule: Omit<PrivacyRule, 'id' | 'profileId' | 'isActive'>) => Promise<void>;
   updatePrivacyRule: (id: number, updates: Partial<PrivacyRule>) => Promise<void>;
   deletePrivacyRule: (id: number) => Promise<void>;
+  setEditingRule: (rule: { ruleId?: number, profileId?: number, isNew?: boolean, initialRules?: any[], initialName?: string } | null) => void;
+  setIsPrivacyModalOpen: (open: boolean) => void;
   
   savePreferences: () => Promise<void>;
   init: () => Promise<void>;
@@ -28,6 +39,9 @@ export interface SettingsSlice {
 export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (set, get) => ({
   apiKeys: [],
   privacyProfiles: [],
+  editingRule: null,
+  isPrivacyModalOpen: false,
+  privacyRefreshCounter: 0,
 
   fetchApiKeys: async () => {
     try {
@@ -199,6 +213,16 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
     } catch (e) {
       console.error("Failed to delete privacy rule", e);
     }
+  },
+
+  setEditingRule: (editingRule) => {
+    console.log('[Store] setEditingRule:', editingRule);
+    set({ editingRule });
+  },
+
+  setIsPrivacyModalOpen: (isPrivacyModalOpen) => {
+    console.log('[Store] setIsPrivacyModalOpen:', isPrivacyModalOpen);
+    set({ isPrivacyModalOpen });
   },
 
   savePreferences: async () => {
