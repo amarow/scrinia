@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Title, Card, Group, Stack, Text, Button, ActionIcon, Badge, Modal, TextInput, MultiSelect } from '@mantine/core';
-import { IconPlus, IconKey, IconShieldLock, IconSettings, IconTrash, IconCopy, IconCheck } from '@tabler/icons-react';
+import { IconPlus, IconKey, IconShieldLock, IconSettings, IconTrash, IconCopy, IconCheck, IconFlask } from '@tabler/icons-react';
 import { useAppStore } from '../../store';
 import { translations } from '../../i18n';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
+import { useNavigate } from 'react-router-dom';
 
 export const ApiKeySettings = () => {
+  const navigate = useNavigate();
   const { 
     apiKeys, fetchApiKeys, createApiKey, deleteApiKey, updateApiKey, 
     generateApiKeyString, tags, privacyProfiles, language, isLoading 
@@ -113,6 +115,14 @@ export const ApiKeySettings = () => {
                           </Group>
                       </Stack>
                       <Group gap="xs">
+                          <ActionIcon 
+                              variant="light" 
+                              color="green"
+                              title="Test Context Export"
+                              onClick={() => navigate(`/export/${key.id}`)}
+                          >
+                              <IconFlask size={16} />
+                          </ActionIcon>
                           <ActionIcon 
                               variant="light" 
                               color="blue"

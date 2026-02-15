@@ -6,6 +6,7 @@ import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, type Dra
 import { Routes, Route } from 'react-router-dom';
 import { HomePage } from './pages/Home';
 import { SettingsPage } from './pages/Settings';
+import { ContextExportPage } from './pages/ContextExport';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
@@ -92,6 +93,7 @@ export default function App() {
           <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/export/:keyId" element={<ContextExportPage />} />
           </Routes>
         </AppShell.Main>
         
