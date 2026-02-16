@@ -21,7 +21,9 @@ const PORT = process.env.PORT || 3001;
 
 console.log("!!! SERVER STARTUP - MODULAR ROUTER VERSION " + Date.now() + " !!!");
 
-app.use(cors());
+app.use(cors({
+    exposedHeaders: ['X-File-Count']
+}));
 app.use(express.json({ limit: '50mb' }));
 
 // --- Public Routes ---

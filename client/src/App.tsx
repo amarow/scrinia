@@ -60,6 +60,8 @@ export default function App() {
             const currentTags = apiKey.permissions.filter(p => p.startsWith('tag:')).map(p => p.split(':')[1]);
             if (!currentTags.includes(String(tagId))) {
                 const newPerms = [...apiKey.permissions, `tag:${tagId}`].join(',');
+                // No need to update store yet, ApiKeyDetail will handle its own state
+                // But we need a way to tell the component. For now, we update the store.
                 useAppStore.getState().updateApiKey(apiKey.id, { permissions: newPerms as any });
             }
         }
@@ -108,11 +110,11 @@ export default function App() {
       <AppShell
         header={{ height: 60 }}
         navbar={{
-          width: activeMainTab === 'filter' ? 300 : 250,
+          width: 300,
           breakpoint: 'sm',
           collapsed: { mobile: !opened },
         }}
-        padding="md"
+        padding={0}
       >
         <Header opened={opened} toggle={toggle} />
         

@@ -83,43 +83,53 @@ export const Sidebar = () => {
                 cursor: 'pointer',
                 borderRadius: '4px',
                 backgroundColor: isActive ? 'var(--mantine-color-blue-light)' : 'transparent',
-                border: isActive ? '1px solid var(--mantine-color-blue-light-color)' : '1px solid transparent'
+                marginBottom: '4px',
+                transition: 'all 0.2s ease',
+                border: `1px solid ${isActive ? 'var(--mantine-color-blue-light-color)' : 'transparent'}`,
+                overflow: 'hidden'
             }}
             onClick={(e) => {
                 e.stopPropagation();
                 toggleScopeActive(scope.id);
             }}
         >
-            <Group gap="xs" p="6px 8px" style={{ flex: 1, minWidth: 0 }}>
-                <Checkbox 
-                    size="xs" 
-                    checked={isActive} 
-                    readOnly
-                    tabIndex={-1}
-                    style={{ pointerEvents: 'none' }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
+            <Button 
+              variant="transparent"
+              color={isActive ? "blue.7" : "gray"}
+              fullWidth 
+              size="xs"
+              justify="flex-start"
+              leftSection={<IconFolder size={14} />}
+              style={{ 
+                  pointerEvents: 'none', 
+                  fontWeight: isActive ? 700 : 500,
+                  height: '30px'
+              }} 
+            >
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                     <Text size="xs" fw={isActive ? 700 : 500} truncate>{scope.name}</Text>
-                    <Text size="10px" c="dimmed" truncate>{scope.path}</Text>
+                    <Text size="10px" c="dimmed" fw={400} truncate>{scope.path}</Text>
                 </div>
-            </Group>
+            </Button>
             
-            <Group gap={0} px={4}>
+            <Group gap={0}>
                 <ActionIcon 
                     variant="subtle" 
                     color="gray" 
-                    size="sm" 
+                    size="30px" 
                     onClick={(e) => handleEditScope(scope, e)}
+                    style={{ borderRadius: 0 }}
                 >
-                    <IconPencil size={12} />
+                    <IconPencil size={14} />
                 </ActionIcon>
                 <ActionIcon 
                     variant="subtle" 
                     color="red" 
-                    size="sm" 
+                    size="30px" 
                     onClick={(e) => handleDeleteScope(scope, e)}
+                    style={{ borderRadius: 0 }}
                 >
-                    <IconTrash size={12} />
+                    <IconTrash size={14} />
                 </ActionIcon>
             </Group>
         </Group>
@@ -128,6 +138,9 @@ export const Sidebar = () => {
 
   const renderTag = (tag: any) => {
     const isSelected = selectedTagIds.includes(tag.id);
+    const tagColor = tag.color || "#228be6";
+    const isSystem = (tag.isEditable as any) === 0;
+    
     return (
     <TagItem 
         key={tag.id} 
@@ -135,67 +148,73 @@ export const Sidebar = () => {
         isSelected={isSelected}
         onClick={(e: React.MouseEvent) => { 
             e.stopPropagation();
-            if (e.ctrlKey || e.metaKey) {
-                toggleTagFilter(tag.id); 
-            } else {
-                if (selectedTagIds.length === 1 && selectedTagIds[0] === tag.id) {
-                    toggleTagFilter(tag.id);
-                } else {
-                    selectSingleTag(tag.id);
-                }
-            }
+            toggleTagFilter(tag.id);
             navigate('/'); 
         }}
     >
-        <Group gap={0} wrap="nowrap">
+        <Group 
+            gap={0} 
+            wrap="nowrap" 
+            mb={4} 
+            style={{ 
+                borderRadius: '4px', 
+                backgroundColor: isSelected ? tagColor : 'transparent',
+                border: `1px solid ${isSelected ? tagColor : `${tagColor}40`}`,
+                transition: 'all 0.2s ease',
+                overflow: 'hidden'
+            }}
+        >
             <Button 
-              variant={isSelected ? "light" : "subtle"}
-              color={isSelected ? (tag.color || "appleBlue") : "gray"}
+              variant="subtle"
+              color={isSelected ? "white" : tagColor}
               fullWidth 
               size="xs"
               justify="space-between"
-              leftSection={<div style={{ width: 30 }} />}
+              leftSection={<IconTag size={14} />}
               rightSection={
                   <div style={{ width: 30, textAlign: 'right', display: 'flex', justifyContent: 'flex-end' }}>
-                      <Text size="xs" fw={700} c={isSelected ? (tag.color || "appleBlue") : "dimmed"}>
+                      <Text size="xs" fw={700} c={isSelected ? "white" : tagColor}>
                           {tag._count?.files}
                       </Text>
                   </div>
               }
               style={{ 
                   pointerEvents: 'none', 
-                  borderTopRightRadius: 0, 
-                  borderBottomRightRadius: 0, 
-                  borderRight: '1px solid rgba(0,0,0,0.1)',
-                  fontWeight: 500
+                  fontWeight: isSelected ? 700 : 600,
+                  color: isSelected ? 'white' : tagColor,
+                  borderRadius: 0,
+                  height: '30px'
               }} 
             >
-            <Text size="xs" fw={600} style={{ flex: 1, textAlign: 'center' }}>
+            <Text size="xs" style={{ flex: 1, textAlign: 'center' }}>
                 {tag.name}
             </Text>
             </Button>
-            <ActionIcon 
-                size="30px" 
-                variant={isSelected ? "light" : "subtle"}
-                color={isSelected ? (tag.color || "appleBlue") : (tag.color || "gray")}
-                style={{ borderRadius: 0, borderRight: '1px solid rgba(0,0,0,0.1)' }}
-                onClick={(e) => openEditTagModal(tag, e)}
-                title={t.editTag}
-                disabled={(tag.isEditable as any) === 0}
-            >
-                <IconPencil size={14} />
-            </ActionIcon>
-            <ActionIcon 
-                size="30px" 
-                variant={isSelected ? "light" : "subtle"}
-                color={isSelected ? (tag.color || "appleBlue") : "gray"}
-                style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
-                onClick={(e) => handleDeleteTag(e, tag)}
-                title={t.deleteTag}
-                disabled={(tag.isEditable as any) === 0}
-            >
-                <IconTrash size={14} />
-            </ActionIcon>
+
+            {!isSystem && (
+                <>
+                    <ActionIcon 
+                        size="30px" 
+                        variant="subtle"
+                        color={isSelected ? "white" : tagColor}
+                        style={{ borderRadius: 0 }}
+                        onClick={(e) => openEditTagModal(tag, e)}
+                        title={t.editTag}
+                    >
+                        <IconPencil size={14} />
+                    </ActionIcon>
+                    <ActionIcon 
+                        size="30px" 
+                        variant="subtle"
+                        color={isSelected ? "white" : tagColor}
+                        style={{ borderRadius: 0 }}
+                        onClick={(e) => handleDeleteTag(e, tag)}
+                        title={t.deleteTag}
+                    >
+                        <IconTrash size={14} />
+                    </ActionIcon>
+                </>
+            )}
         </Group>
     </TagItem>
   )};

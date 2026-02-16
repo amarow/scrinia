@@ -44,6 +44,16 @@ export const PublicController = {
                     .filter(id => !isNaN(id));
             }
 
+            // Allow UI overrides for preview if the owner is authenticated
+            const { overrideTags, overrideProfiles } = req.query as { overrideTags?: string, overrideProfiles?: string };
+            if (overrideTags !== undefined && (req as AuthRequest).user) {
+                allowedTagIds = overrideTags ? overrideTags.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
+            }
+            let activeProfileIds = apiKey?.privacyProfileIds || [];
+            if (overrideProfiles !== undefined && (req as AuthRequest).user) {
+                activeProfileIds = overrideProfiles ? overrideProfiles.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
+            }
+
             // Get files based on tag, search query, or all
             let files: any[] = [];
             if (tag) {
@@ -71,8 +81,8 @@ export const PublicController = {
                     if (!['.pdf', '.docx', '.txt', '.md', '.odt', '.rtf'].includes(file.extension.toLowerCase())) continue;
                     
                     let text = await fileService.extractText(file.path, file.extension);
-                    if (apiKey && apiKey.privacyProfileIds && apiKey.privacyProfileIds.length > 0) {
-                        text = await privacyService.redactWithMultipleProfiles(text, apiKey.privacyProfileIds, asHtml);
+                    if (activeProfileIds.length > 0) {
+                        text = await privacyService.redactWithMultipleProfiles(text, activeProfileIds, asHtml);
                     } else if (asHtml) {
                         text = await privacyService.redactWithMultipleProfiles(text, [], true);
                     }
@@ -91,6 +101,7 @@ export const PublicController = {
             }
             
             res.setHeader('Content-Type', asHtml ? 'text/html' : 'text/plain');
+            res.setHeader('X-File-Count', files.length.toString());
             res.send(fullContext);
         } catch (e: any) {
             res.status(500).json({ error: e.message });
@@ -113,6 +124,16 @@ export const PublicController = {
                     .filter(p => p.startsWith('tag:'))
                     .map(p => parseInt(p.split(':')[1]))
                     .filter(id => !isNaN(id));
+            }
+
+            // Allow UI overrides for preview
+            const { overrideTags, overrideProfiles } = req.query as { overrideTags?: string, overrideProfiles?: string };
+            if (overrideTags !== undefined && (req as AuthRequest).user) {
+                allowedTagIds = overrideTags ? overrideTags.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
+            }
+            let activeProfileIds = apiKey?.privacyProfileIds || [];
+            if (overrideProfiles !== undefined && (req as AuthRequest).user) {
+                activeProfileIds = overrideProfiles ? overrideProfiles.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
             }
 
             // Get files
@@ -143,8 +164,8 @@ export const PublicController = {
                     }
 
                     let text = await fileService.extractText(file.path, file.extension);
-                    if (apiKey && apiKey.privacyProfileIds && apiKey.privacyProfileIds.length > 0) {
-                        text = await privacyService.redactWithMultipleProfiles(text, apiKey.privacyProfileIds, asHtml);
+                    if (activeProfileIds.length > 0) {
+                        text = await privacyService.redactWithMultipleProfiles(text, activeProfileIds, asHtml);
                     } else if (asHtml) {
                         text = await privacyService.redactWithMultipleProfiles(text, [], true);
                     }
@@ -165,6 +186,7 @@ export const PublicController = {
                 }
             }
             
+            res.setHeader('X-File-Count', results.length.toString());
             res.json(results);
         } catch (e: any) {
             res.status(500).json({ error: e.message });

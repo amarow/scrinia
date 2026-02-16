@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Modal, Stack, Group, Select, Text, TextInput, Paper, ActionIcon, Button, ScrollArea, LoadingOverlay, Badge } from '@mantine/core';
+import { Modal, Stack, Group, Select, Text, TextInput, Paper, ActionIcon, Button, ScrollArea, LoadingOverlay, Badge, NumberInput, SegmentedControl } from '@mantine/core';
 import { IconCopy, IconExternalLink, IconSearch, IconAdjustmentsHorizontal, IconFileText, IconBraces, IconEye } from '@tabler/icons-react';
 import { useAppStore } from '../../store';
 import { translations } from '../../i18n';
@@ -26,7 +26,15 @@ export const ContextExportModal = ({ opened, onClose, apiKey }: ContextExportMod
     const [batchLimit, setBatchLimit] = useState<number>(50);
     const [responseFormat, setResponseFormat] = useState<'text' | 'json'>('text');
     const [previewContent, setPreviewContent] = useState<string | null>(null);
+    const [previewCount, setPreviewCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+
+    // Trigger preview automatically when tag or format changes
+    useEffect(() => {
+        if (opened && apiKey && (batchTag || responseFormat)) {
+            handleFetchPreview();
+        }
+    }, [batchTag, responseFormat, opened]);
 
     const getDynamicUrl = () => {
         let endpoint = responseFormat === 'json' ? 'json' : 'text';
@@ -39,8 +47,14 @@ export const ContextExportModal = ({ opened, onClose, apiKey }: ContextExportMod
     const handleFetchPreview = async () => {
         if (!token) return;
         setLoading(true);
+        setPreviewCount(null);
         try {
             const res = await authFetch(getDynamicUrl(), token);
+            const countHeader = res.headers.get('X-File-Count');
+            if (countHeader) {
+                setPreviewCount(parseInt(countHeader));
+            }
+            
             if (responseFormat === 'json') {
                 const data = await res.json();
                 setPreviewContent(JSON.stringify(data, null, 2));
@@ -138,16 +152,34 @@ export const ContextExportModal = ({ opened, onClose, apiKey }: ContextExportMod
                 </Stack>
 
                 <Stack gap="xs" style={{ flex: 1, position: 'relative' }}>
-                    <Group justify="space-between">
-                        <Text size="sm" fw={700}>Export Preview</Text>
-                        <Button 
-                            size="compact-xs" 
-                            variant="light" 
-                            leftSection={<IconEye size={14} />}
-                            onClick={handleFetchPreview}
-                        >
-                            Refresh Preview
-                        </Button>
+                    <Group justify="space-between" align="center">
+                        <Group gap="xs">
+                            <Text size="sm" fw={700}>Export Preview</Text>
+                            {previewCount !== null && (
+                                <Badge variant="filled" color="blue" size="xs">
+                                    {previewCount} {previewCount === 1 ? 'file' : 'files'}
+                                </Badge>
+                            )}
+                        </Group>
+                        <Group gap="xs">
+                            <SegmentedControl
+                                size="xs"
+                                value={responseFormat}
+                                onChange={(val) => setResponseFormat(val as any)}
+                                data={[
+                                    { label: 'Text', value: 'text' },
+                                    { label: 'JSON', value: 'json' },
+                                ]}
+                            />
+                            <Button 
+                                size="compact-xs" 
+                                variant="light" 
+                                leftSection={<IconEye size={14} />}
+                                onClick={handleFetchPreview}
+                            >
+                                Refresh
+                            </Button>
+                        </Group>
                     </Group>
                     <Paper 
                         withBorder 
@@ -177,7 +209,8 @@ const ContextSettings = ({
     batchQuery, setBatchQuery, 
     batchLimit, setBatchLimit, 
     responseFormat, setResponseFormat,
-    getAvailableTags 
+    getAvailableTags,
+    handleFetchPreview
 }: any) => (
     <Group align="flex-end" gap="sm">
         <Select
@@ -197,27 +230,19 @@ const ContextSettings = ({
             leftSection={<IconSearch size={14} />}
             value={batchQuery}
             onChange={(e) => setBatchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleFetchPreview()}
             style={{ flex: 1 }}
         />
-        <Select
-            label="Format"
-            size="xs"
-            leftSection={responseFormat === 'json' ? <IconBraces size={14} /> : <IconFileText size={14} />}
-            data={[
-                { value: 'text', label: 'Text' },
-                { value: 'json', label: 'JSON' }
-            ]}
-            value={responseFormat}
-            onChange={(val) => setResponseFormat(val as any)}
-            style={{ width: 90 }}
-        />
-        <Select
+        <TextInput
             label="Limit"
             size="xs"
-            data={['10', '50', '100', '200']}
             value={batchLimit.toString()}
-            onChange={(val) => setBatchLimit(parseInt(val || '50'))}
-            style={{ width: 70 }}
+            onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setBatchLimit(isNaN(val) ? 0 : val);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handleFetchPreview()}
+            style={{ width: 60 }}
         />
     </Group>
 );

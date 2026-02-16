@@ -135,22 +135,40 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
 export const authenticateAny = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
-  const apiKeyHeader = req.headers['x-api-key'];
-  const apiKeyQuery = req.query.apiKey;
+  const token = authHeader && authHeader.split(' ')[1];
   
-  if (apiKeyHeader || apiKeyQuery || (authHeader && authHeader.startsWith('Bearer '))) {
-    const token = authHeader && authHeader.split(' ')[1];
-    
-    // If we have an explicit API key (header or query), use it
-    if (apiKeyHeader || apiKeyQuery) {
+  // 1. Try JWT first (UI access)
+  if (token && token.split('.').length === 3) {
+    jwt.verify(token, SECRET_KEY, async (err: any, user: any) => {
+      if (!err) {
+        (req as AuthRequest).user = user;
+        
+        // If we also have an API Key in query, load its metadata but keep the user
+        const apiKeyQuery = req.query.apiKey as string;
+        if (apiKeyQuery) {
+            const apiKeyRecord = await apiKeyRepository.verify(apiKeyQuery);
+            if (apiKeyRecord) {
+                (req as AuthRequest).apiKey = {
+                    id: apiKeyRecord.id,
+                    name: apiKeyRecord.name,
+                    permissions: apiKeyRecord.permissions,
+                    privacyProfileIds: apiKeyRecord.privacyProfileIds
+                };
+            }
+        }
+        return next();
+      }
+      
+      // If JWT failed but we have an API Key, try API Key
+      if (req.headers['x-api-key'] || req.query.apiKey) {
         return authenticateApiKey(req, res, next);
-    }
-
-    // Simple check: if it has 3 parts separated by dots, it's likely a JWT
-    if (token && token.split('.').length === 3) {
-        return authenticateToken(req, res, next);
-    }
+      }
+      return res.status(403).json({ error: 'Invalid token' });
+    });
+  } else if (req.headers['x-api-key'] || req.query.apiKey || (authHeader && authHeader.startsWith('Bearer '))) {
+    // 2. Fallback to API Key
     return authenticateApiKey(req, res, next);
+  } else {
+    return res.status(401).json({ error: 'Authentication required' });
   }
-  return authenticateToken(req, res, next);
 };

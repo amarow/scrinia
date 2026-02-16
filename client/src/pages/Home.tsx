@@ -139,7 +139,7 @@ export function HomePage() {
   // If a file is selected for preview, show the panel instead of the list
   // Use display: none instead of conditional rendering to preserve scroll position and virtualizer state
   return (
-    <>
+    <div style={{ padding: 'var(--mantine-spacing-md)', height: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: previewFileId ? 'block' : 'none', height: '100%' }}>
             {previewFileId && <FilePreviewPanel />}
         </div>
@@ -376,6 +376,6 @@ export function HomePage() {
             )}
             </div>
         </div>
-    </>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Stack, Group, Select, Text, TextInput, Paper, ActionIcon, Button, ScrollArea, LoadingOverlay, Badge, Title } from '@mantine/core';
+import { Container, Stack, Group, Select, Text, TextInput, Paper, ActionIcon, Button, ScrollArea, LoadingOverlay, Badge, Title, NumberInput, SegmentedControl } from '@mantine/core';
 import { IconCopy, IconExternalLink, IconSearch, IconAdjustmentsHorizontal, IconFileText, IconBraces, IconEye, IconArrowLeft } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
@@ -18,6 +18,7 @@ export function ContextExportPage() {
     const [batchLimit, setBatchLimit] = useState<number>(50);
     const [responseFormat, setResponseFormat] = useState<'text' | 'json'>('text');
     const [previewContent, setPreviewContent] = useState<string | null>(null);
+    const [previewCount, setPreviewCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Find the specific API Key
@@ -29,6 +30,13 @@ export function ContextExportPage() {
             if (tags.length === 0) fetchTags();
         }
     }, [token]);
+
+    // Trigger preview automatically when tag or format changes
+    useEffect(() => {
+        if (apiKey && (batchTag || responseFormat)) {
+            handleFetchPreview();
+        }
+    }, [batchTag, responseFormat, apiKey]);
 
     const getDynamicUrl = () => {
         if (!apiKey) return '';
@@ -42,12 +50,19 @@ export function ContextExportPage() {
     const handleFetchPreview = async () => {
         if (!apiKey) return;
         setLoading(true);
+        setPreviewCount(null);
         try {
             const res = await fetch(getDynamicUrl());
             if (!res.ok) {
                 const errorData = await res.json();
                 throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
             }
+
+            const countHeader = res.headers.get('X-File-Count');
+            if (countHeader) {
+                setPreviewCount(parseInt(countHeader));
+            }
+
             if (responseFormat === 'json') {
                 const data = await res.json();
                 setPreviewContent(JSON.stringify(data, null, 2));
@@ -138,26 +153,19 @@ export function ContextExportPage() {
                                 leftSection={<IconSearch size={14} />}
                                 value={batchQuery}
                                 onChange={(e) => setBatchQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleFetchPreview()}
                                 style={{ flex: 1 }}
                             />
-                            <Select
-                                label="Format"
-                                size="sm"
-                                data={[
-                                    { value: 'text', label: 'Text' },
-                                    { value: 'json', label: 'JSON' }
-                                ]}
-                                value={responseFormat}
-                                onChange={(val) => setResponseFormat(val as any)}
-                                style={{ width: 100 }}
-                            />
-                            <Select
+                            <TextInput
                                 label="Limit"
                                 size="sm"
-                                data={['10', '50', '100', '200']}
                                 value={batchLimit.toString()}
-                                onChange={(val) => setBatchLimit(parseInt(val || '50'))}
-                                style={{ width: 80 }}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setBatchLimit(isNaN(val) ? 0 : val);
+                                }}
+                                onKeyDown={(e) => e.key === 'Enter' && handleFetchPreview()}
+                                style={{ width: 60 }}
                             />
                             <Button 
                                 onClick={handleFetchPreview}
@@ -205,7 +213,25 @@ export function ContextExportPage() {
                     </Stack>
 
                     <Stack gap="xs" style={{ flex: 1, position: 'relative' }}>
-                        <Text size="sm" fw={700}>Preview Result</Text>
+                        <Group justify="space-between" align="center">
+                            <Group gap="xs">
+                                <Text size="sm" fw={700}>Preview Result</Text>
+                                {previewCount !== null && (
+                                    <Badge variant="filled" color="blue" size="xs">
+                                        {previewCount} {previewCount === 1 ? 'file' : 'files'}
+                                    </Badge>
+                                )}
+                            </Group>
+                            <SegmentedControl
+                                size="xs"
+                                value={responseFormat}
+                                onChange={(val) => setResponseFormat(val as any)}
+                                data={[
+                                    { label: 'Text', value: 'text' },
+                                    { label: 'JSON', value: 'json' },
+                                ]}
+                            />
+                        </Group>
                         <Paper 
                             withBorder 
                             p="md" 

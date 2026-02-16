@@ -1,4 +1,4 @@
-import { NavLink, Stack, Text, Group, ActionIcon, ScrollArea, Tooltip, Badge, Box } from '@mantine/core';
+import { NavLink, Stack, Text, Group, ActionIcon, ScrollArea, Tooltip, Badge, Box, Divider } from '@mantine/core';
 import { IconKey, IconShieldLock, IconPlus, IconDatabase, IconTag } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -27,7 +27,6 @@ const DraggableItem = ({ id, type, name, children }: { id: string | number, type
 
 export const DataSidebar = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
   const location = useLocation();
   const { 
     apiKeys, fetchApiKeys, privacyProfiles, fetchPrivacyProfiles, language, 
@@ -35,6 +34,12 @@ export const DataSidebar = () => {
     tags, fetchTags
   } = useAppStore();
   const t = translations[language];
+
+  // Manually extract IDs from path since DataSidebar is outside the Route context
+  const keyMatch = location.pathname.match(/\/data\/key\/(\d+)/);
+  const rulesetMatch = location.pathname.match(/\/data\/ruleset\/(\d+)/);
+  const currentKeyId = keyMatch ? keyMatch[1] : null;
+  const currentRulesetId = rulesetMatch ? rulesetMatch[1] : null;
 
   useEffect(() => {
     fetchApiKeys();
@@ -47,7 +52,7 @@ export const DataSidebar = () => {
 
   return (
     <ScrollArea h="100%" p="xs">
-      <Stack gap="xl">
+      <Stack gap="md">
         {/* API KEYS SECTION */}
         <Stack gap="xs">
           <Group justify="space-between" px="xs">
@@ -79,7 +84,7 @@ export const DataSidebar = () => {
                 key={key.id}
                 label={key.name}
                 leftSection={<IconKey size={14} />}
-                active={isKeyActive && id === key.id.toString()}
+                active={isKeyActive && currentKeyId === key.id.toString()}
                 onClick={() => navigate(`/data/key/${key.id}`)}
                 variant="light"
                 styles={{ label: { fontSize: '13px' } }}
@@ -87,6 +92,8 @@ export const DataSidebar = () => {
             ))}
           </Stack>
         </Stack>
+
+        <Divider variant="dashed" mx="xs" />
 
         {/* RULESETS SECTION */}
         <Stack gap="xs">
@@ -113,19 +120,20 @@ export const DataSidebar = () => {
           
           <Stack gap={2}>
             {privacyProfiles.map(profile => (
-              <DraggableItem key={profile.id} id={profile.id} type="RULESET" name={profile.name}>
-                <NavLink
-                  label={profile.name}
-                  leftSection={<IconShieldLock size={14} />}
-                  active={isRulesetActive && id === profile.id.toString()}
-                  onClick={() => navigate(`/data/ruleset/${profile.id}`)}
-                  variant="light"
-                  styles={{ label: { fontSize: '13px' } }}
-                />
-              </DraggableItem>
+              <NavLink
+                key={profile.id}
+                label={<DraggableItem id={profile.id} type="RULESET" name={profile.name}>{profile.name}</DraggableItem>}
+                leftSection={<IconShieldLock size={14} />}
+                active={isRulesetActive && currentRulesetId === profile.id.toString()}
+                onClick={() => navigate(`/data/ruleset/${profile.id}`)}
+                variant="light"
+                styles={{ label: { fontSize: '13px' } }}
+              />
             ))}
           </Stack>
         </Stack>
+
+        <Divider variant="dashed" mx="xs" />
 
         {/* TAGS SECTION */}
         <Stack gap="xs">
@@ -135,7 +143,7 @@ export const DataSidebar = () => {
               {t.tags}
             </Text>
           </Group>
-          <Group gap={5} px="xs">
+          <Group gap={5} px="xs" wrap="wrap">
             {tags.map(tag => (
               <DraggableItem key={tag.id} id={tag.id} type="TAG" name={tag.name}>
                 <Badge 

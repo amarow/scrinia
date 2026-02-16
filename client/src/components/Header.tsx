@@ -16,15 +16,17 @@ export const Header = ({ opened, toggle }: HeaderProps) => {
   const location = useLocation();
   const { 
     logout, user, searchCriteria, setSearchCriteria, performSearch, 
-    language, toggleLanguage, activeMainTab, setActiveMainTab
+    language, toggleLanguage, activeMainTab, setActiveMainTab,
+    lastDataPath, setLastDataPath
   } = useAppStore();
   
   const t = translations[language];
 
-  // Sync tab with location
+  // Sync tab with location and remember path
   useEffect(() => {
     if (location.pathname.startsWith('/data')) {
       setActiveMainTab('data');
+      setLastDataPath(location.pathname);
     } else {
       setActiveMainTab('filter');
     }
@@ -34,7 +36,7 @@ export const Header = ({ opened, toggle }: HeaderProps) => {
     const tab = val as 'filter' | 'data';
     setActiveMainTab(tab);
     if (tab === 'filter') navigate('/');
-    else navigate('/data');
+    else navigate(lastDataPath);
   };
 
   const logo = (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Group, Stack, Text, Button, ActionIcon, TextInput, MultiSelect, Paper, Title, Divider, Badge, Select, LoadingOverlay, ScrollArea, Grid, Box } from '@mantine/core';
+import { Group, Stack, Text, Button, ActionIcon, TextInput, MultiSelect, Paper, Title, Divider, Badge, Select, LoadingOverlay, ScrollArea, Grid, Box, NumberInput, SegmentedControl } from '@mantine/core';
 import { IconKey, IconCheck, IconCopy, IconShieldLock, IconDatabase, IconSearch, IconFileText, IconBraces, IconEye, IconExternalLink, IconX } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
@@ -31,6 +31,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   const [batchLimit, setBatchLimit] = useState<number>(50);
   const [responseFormat, setResponseFormat] = useState<'text' | 'json'>('text');
   const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const apiKey = apiKeys.find(k => k.id === apiKeyId);
@@ -42,6 +43,13 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
       setSelectedProfiles(apiKey.privacyProfileIds ? apiKey.privacyProfileIds.map(String) : []);
     }
   }, [apiKeyId, apiKeys]);
+
+  // Trigger preview automatically when ANY setting changes
+  useEffect(() => {
+    if (apiKey) {
+        handleFetchPreview();
+    }
+  }, [apiKeyId, batchTag, responseFormat, batchQuery, batchLimit, selectedTags, selectedProfiles]);
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -75,26 +83,39 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
     });
   };
 
-  const getDynamicUrl = () => {
+  const getDynamicUrl = (useOverrides = false) => {
     if (!apiKey) return '';
     let endpoint = responseFormat === 'json' ? 'json' : 'text';
     let url = `${API_BASE}/api/v1/files/${endpoint}?apiKey=${apiKey.key}&limit=${batchLimit}`;
     if (batchTag) url += `&tag=${encodeURIComponent(batchTag)}`;
     if (batchQuery) url += `&q=${encodeURIComponent(batchQuery)}`;
+    
+    if (useOverrides) {
+        if (selectedTags.length > 0) url += `&overrideTags=${selectedTags.join(',')}`;
+        if (selectedProfiles.length > 0) url += `&overrideProfiles=${selectedProfiles.join(',')}`;
+    }
+    
     return url;
   };
 
   const handleFetchPreview = async () => {
-    if (!apiKey) return;
+    if (!apiKey || !token) return;
     setPreviewLoading(true);
+    setPreviewCount(null);
     try {
         // For preview, we always want HTML highlighting if possible
-        let previewUrl = getDynamicUrl() + '&format=html';
+        // We use overrides to reflect the current UI state (tags, profiles) before saving
+        let previewUrl = getDynamicUrl(true) + '&format=html';
 
-        const res = await fetch(previewUrl);
+        const res = await authFetch(previewUrl, token);
         if (!res.ok) {
             const errorData = await res.json();
             throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+        }
+
+        const countHeader = res.headers.get('X-File-Count');
+        if (countHeader) {
+            setPreviewCount(parseInt(countHeader));
         }
         
         if (responseFormat === 'json') {
@@ -113,29 +134,24 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
 
   const getAvailableTags = () => {
     if (!apiKey) return [];
-    if (apiKey.permissions.includes('all')) {
-        return tags.map(t => ({ value: t.name, label: t.name }));
-    }
-    const allowedTagIds = apiKey.permissions
-        .filter(p => p.startsWith('tag:'))
-        .map(p => parseInt(p.split(':')[1]));
-
+    
+    // Use the tags that are currently selected for this API key in the UI
     return tags
-        .filter(t => allowedTagIds.includes(t.id))
+        .filter(t => selectedTags.includes(t.id.toString()))
         .map(t => ({ value: t.name, label: t.name }));
   };
 
   if (!apiKey) return <Text>API Key not found</Text>;
 
   return (
-    <Stack gap="md">
+    <Stack gap="md" style={{ height: '100%', minHeight: 0 }}>
         <Paper 
             ref={setNodeRef}
             withBorder 
             p="xs" 
             radius="md" 
             bg={isOver ? 'var(--mantine-color-blue-light)' : 'var(--mantine-color-body)'}
-            style={{ transition: 'background-color 0.2s ease', border: isOver ? '1px solid var(--mantine-color-blue-filled)' : undefined }}
+            style={{ transition: 'background-color 0.2s ease', border: isOver ? '1px solid var(--mantine-color-blue-filled)' : undefined, flexShrink: 0 }}
         >
             <Group justify="space-between" align="flex-end" wrap="nowrap">
                 <Group align="flex-end" gap="xs" style={{ flex: 1 }}>
@@ -180,9 +196,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
                                         color={tag.color || 'blue'}
                                         rightSection={
                                             <ActionIcon size="xs" variant="transparent" color="gray" onClick={() => {
-                                                const newTags = selectedTags.filter(tId => tId !== id);
-                                                setSelectedTags(newTags);
-                                                // Trigger auto-save if desired, or keep manual
+                                                setSelectedTags(prev => prev.filter(tId => tId !== id));
                                             }}>
                                                 <IconX size={10} />
                                             </ActionIcon>
@@ -209,8 +223,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
                                         leftSection={<IconShieldLock size={10} />}
                                         rightSection={
                                             <ActionIcon size="xs" variant="transparent" color="gray" onClick={() => {
-                                                const newProfiles = selectedProfiles.filter(pId => pId !== id);
-                                                setSelectedProfiles(newProfiles);
+                                                setSelectedProfiles(prev => prev.filter(pId => pId !== id));
                                             }}>
                                                 <IconX size={10} />
                                             </ActionIcon>
@@ -234,7 +247,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
             </Group>
         </Paper>
 
-        <Paper withBorder p="xs" radius="md" bg="var(--mantine-color-body)">
+        <Paper withBorder p="xs" radius="md" bg="var(--mantine-color-body)" style={{ flexShrink: 0 }}>
             <Stack gap="xs">
                 <ContextBuilderSettings 
                     batchTag={batchTag} setBatchTag={setBatchTag}
@@ -305,9 +318,24 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
         </Paper>
 
         <Stack gap="xs" style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-            <Group justify="space-between" align="center">
-                <Text size="sm" fw={700}>Preview Result</Text>
-                <Badge variant="dot" size="xs" color="blue">Live Preview</Badge>
+            <Group justify="space-between" align="center" style={{ flexShrink: 0 }}>
+                <Group gap="xs">
+                    <Text size="sm" fw={700}>Preview Result</Text>
+                    {previewCount !== null && (
+                        <Badge variant="filled" color="blue" size="xs">
+                            {previewCount} {previewCount === 1 ? 'file' : 'files'}
+                        </Badge>
+                    )}
+                </Group>
+                <SegmentedControl
+                    size="xs"
+                    value={responseFormat}
+                    onChange={(val) => setResponseFormat(val as any)}
+                    data={[
+                        { label: 'Text', value: 'text' },
+                        { label: 'JSON', value: 'json' },
+                    ]}
+                />
             </Group>
             <Paper 
                 withBorder 
@@ -320,7 +348,6 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
                     fontSize: '11px',
                     whiteSpace: 'pre-wrap',
                     position: 'relative',
-                    minHeight: '500px',
                     cursor: 'text'
                 }}
                 onClick={handlePreviewClick}
@@ -363,26 +390,19 @@ const ContextBuilderSettings = ({
             leftSection={<IconSearch size={14} />}
             value={batchQuery}
             onChange={(e) => setBatchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleFetchPreview()}
             style={{ flex: 1 }}
         />
-        <Select
-            label="Format"
-            size="sm"
-            data={[
-                { value: 'text', label: 'Text' },
-                { value: 'json', label: 'JSON' }
-            ]}
-            value={responseFormat}
-            onChange={(val) => setResponseFormat(val as any)}
-            style={{ width: 90 }}
-        />
-        <Select
+        <TextInput
             label="Limit"
             size="sm"
-            data={['10', '50', '100', '200']}
             value={batchLimit.toString()}
-            onChange={(val) => setBatchLimit(parseInt(val || '50'))}
-            style={{ width: 80 }}
+            onChange={(e) => {
+                const val = parseInt(e.target.value);
+                setBatchLimit(isNaN(val) ? 0 : val);
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handleFetchPreview()}
+            style={{ width: 60 }}
         />
         <Button 
             onClick={handleFetchPreview}

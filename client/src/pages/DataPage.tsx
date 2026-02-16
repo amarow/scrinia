@@ -43,12 +43,15 @@ export function DataPage() {
             radius={0} 
             style={{ 
                 height: 'calc(100vh - 60px)', 
-                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
                 background: 'transparent',
-                border: 0
+                border: 0,
+                overflow: 'hidden',
+                boxSizing: 'border-box'
             }}
         >
-            <div style={{ width: '100%' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, width: '100%' }}>
                 {renderContent()}
             </div>
         </Paper>
