@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Group, Stack, Text, Button, ActionIcon, TextInput, MultiSelect, Paper, Title, Divider, Badge, Select, LoadingOverlay, ScrollArea, Grid, Box, NumberInput, SegmentedControl } from '@mantine/core';
-import { IconKey, IconCheck, IconCopy, IconShieldLock, IconDatabase, IconSearch, IconFileText, IconBraces, IconEye, IconExternalLink, IconX } from '@tabler/icons-react';
+import { IconKey, IconCheck, IconCopy, IconShieldLock, IconDatabase, IconSearch, IconFileText, IconBraces, IconEye, IconExternalLink, IconX, IconTrash } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { authFetch, API_BASE } from '../store/utils';
 import { useDroppable } from '@dnd-kit/core';
 
@@ -12,7 +13,8 @@ import { useNavigate } from 'react-router-dom';
 export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   const navigate = useNavigate();
   const { 
-    apiKeys, updateApiKey, tags, privacyProfiles, language, isLoading, token
+    apiKeys, updateApiKey, deleteApiKey, tags, privacyProfiles, language, isLoading, token,
+    fetchPrivacyRules, addPrivacyRule
   } = useAppStore();
   const t = translations[language];
 
@@ -44,12 +46,12 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
     }
   }, [apiKeyId, apiKeys]);
 
-  // Trigger preview automatically when ANY setting changes
+  // Trigger preview automatically when format changes or key changes
   useEffect(() => {
     if (apiKey) {
         handleFetchPreview();
     }
-  }, [apiKeyId, batchTag, responseFormat, batchQuery, batchLimit, selectedTags, selectedProfiles]);
+  }, [apiKeyId, responseFormat]);
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -74,12 +76,27 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
         permissions: perms as any, 
         privacyProfileIds: profileIds 
     });
+
+    handleFetchPreview();
     
     notifications.show({
         title: t.save,
         message: 'API Key updated successfully',
         color: 'green',
         icon: <IconCheck size={16} />
+    });
+  };
+
+  const handleDelete = () => {
+    modals.openConfirmModal({
+        title: t.deleteKeyTitle,
+        children: <Text size="sm">{t.areYouSure}</Text>,
+        labels: { confirm: t.delete, cancel: t.cancel },
+        confirmProps: { color: 'red' },
+        onConfirm: async () => {
+            await deleteApiKey(apiKeyId);
+            navigate('/data');
+        },
     });
   };
 
@@ -236,14 +253,24 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
                         </Group>
                     </Stack>
                 </Group>
-                <Button 
-                    size="xs"
-                    onClick={handleSave} 
-                    loading={isLoading}
-                    leftSection={<IconCheck size={16} />}
-                >
-                    {t.save}
-                </Button>
+                <Group gap="xs">
+                    <Button 
+                        size="xs"
+                        onClick={handleSave} 
+                        loading={isLoading}
+                        leftSection={<IconCheck size={16} />}
+                    >
+                        {t.save}
+                    </Button>
+                    <ActionIcon 
+                        variant="light" 
+                        color="red" 
+                        size="lg"
+                        onClick={handleDelete}
+                    >
+                        <IconTrash size={20} />
+                    </ActionIcon>
+                </Group>
             </Group>
         </Paper>
 
@@ -340,6 +367,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
             <Paper 
                 withBorder 
                 p="xs" 
+                className="preview-result-container"
                 style={{ 
                     flex: 1,
                     overflow: 'auto',

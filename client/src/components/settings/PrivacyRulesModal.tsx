@@ -94,6 +94,12 @@ export const PrivacyRulesModal = ({ onSaveSuccess }: { onSaveSuccess?: () => voi
       useAppStore.setState((state: any) => ({ privacyRefreshCounter: state.privacyRefreshCounter + 1 }));
       setIsPrivacyModalOpen(false);
       setEditingRule(null);
+      notifications.show({
+          title: t.save,
+          message: 'Ruleset updated successfully',
+          color: 'green',
+          icon: <IconCheck size={16} />
+      });
       if (onSaveSuccess) onSaveSuccess();
   };
 

@@ -1,16 +1,69 @@
 import { useState, useEffect } from 'react';
 import { AppShell, Stack, Group, Text, TextInput, ActionIcon, ScrollArea, Button, Modal, ColorSwatch, Box, Checkbox, Divider, Tooltip } from '@mantine/core';
-import { IconPlus, IconPencil, IconTrash, IconCheck, IconFolder, IconTag, IconDatabase } from '@tabler/icons-react';
+import { IconPlus, IconPencil, IconTrash, IconCheck, IconFolder, IconTag, IconDatabase, IconShieldLock } from '@tabler/icons-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
 import { TagItem } from './DndComponents';
 import { modals } from '@mantine/modals';
 import { DirectoryPickerModal } from './DirectoryPickerModal';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 const TAG_COLORS = [
     '#fa5252', '#fd7e14', '#fab005', '#40c057', '#228be6', '#7950f2', '#e64980', '#868e96'
 ];
+
+const DroppableRuleset = ({ profile }: { profile: any }) => {
+    const [nativeOver, setNativeOver] = useState(false);
+    const addPrivacyRule = useAppStore(state => state.addPrivacyRule);
+
+    const { setNodeRef, isOver } = useDroppable({
+      id: `ruleset-drop-sidebar-${profile.id}`,
+      data: { type: 'RULESET_TARGET', id: profile.id }
+    });
+
+    const handleNativeDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setNativeOver(false);
+        const text = e.dataTransfer.getData('text');
+        if (text && profile.id) {
+            addPrivacyRule(profile.id, {
+                type: 'LITERAL',
+                pattern: text,
+                replacement: '[REDACTED]'
+            });
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!nativeOver) setNativeOver(true);
+    };
+  
+    return (
+      <Box 
+        ref={setNodeRef} 
+        onDragEnter={() => setNativeOver(true)}
+        onDragOver={handleDragOver}
+        onDragLeave={() => setNativeOver(false)}
+        onDrop={handleNativeDrop}
+        style={{ 
+          borderRadius: '4px',
+          backgroundColor: (isOver || nativeOver) ? 'var(--mantine-color-blue-light)' : 'transparent',
+          transition: 'background-color 0.2s ease',
+          padding: '2px'
+        }}
+      >
+        <Group gap="xs" p="4px 8px" style={{ cursor: 'default' }}>
+            <IconShieldLock size={14} color={(isOver || nativeOver) ? 'var(--mantine-color-blue-filled)' : 'gray'} />
+            <Text size="xs" fw={500}>{profile.name}</Text>
+        </Group>
+      </Box>
+    );
+};
 
 export const Sidebar = () => {
   const navigate = useNavigate();
@@ -19,13 +72,15 @@ export const Sidebar = () => {
     tags, selectedTagIds, toggleTagFilter, selectSingleTag, createTag, 
     updateTag, deleteTag, language,
     scopes, activeScopeIds, toggleScopeActive, fetchScopes,
-    addScope, deleteScope, updateScope
+    addScope, deleteScope, updateScope,
+    privacyProfiles, fetchPrivacyProfiles
   } = useAppStore();
   
   const t = translations[language];
 
   useEffect(() => {
     fetchScopes();
+    fetchPrivacyProfiles();
   }, []);
 
   const [newTagInput, setNewTagInput] = useState('');
@@ -261,10 +316,9 @@ export const Sidebar = () => {
 
   return (
     <>
-      <AppShell.Navbar p="md" onClick={() => { if (location.pathname === '/settings') navigate('/'); }} style={{ cursor: location.pathname === '/settings' ? 'pointer' : 'default' }}>
-        <Stack gap="xs" style={{ height: '100%', overflow: 'hidden' }}>
-          <ScrollArea h="100%">
-            <Stack gap="xl">
+      <Stack p="md" gap="xs" style={{ height: '100%', overflow: 'hidden' }}>
+        <ScrollArea h="100%">
+          <Stack gap="xl">
               
               {/* SOURCES SECTION */}
               <Stack gap="xs">
@@ -324,10 +378,29 @@ export const Sidebar = () => {
                 </Stack>
               </Stack>
 
+              <Divider variant="dashed" />
+
+              {/* QUICK RULESETS SECTION */}
+              <Stack gap="xs" pb="xl">
+                <Group gap="xs" px="xs">
+                  <IconShieldLock size={16} c="green" />
+                  <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
+                    {t.privacy} (Drop Target)
+                  </Text>
+                </Group>
+                <Stack gap={2}>
+                  {privacyProfiles.map(profile => (
+                    <DroppableRuleset key={profile.id} profile={profile} />
+                  ))}
+                  {privacyProfiles.length === 0 && (
+                      <Text size="xs" c="dimmed" px="xs" fs="italic">No rulesets found.</Text>
+                  )}
+                </Stack>
+              </Stack>
+
             </Stack>
           </ScrollArea>
         </Stack>
-      </AppShell.Navbar>
 
       <DirectoryPickerModal 
         opened={isPickerOpen}

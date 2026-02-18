@@ -18,8 +18,9 @@ if (!fs.existsSync(dbDir)) {
 
 export const db = new Database(dbPath);
 
-// Enable WAL mode for better concurrency
+// Enable WAL mode and foreign keys
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 // Initialize Schema only in main thread
 if (isMainThread) {

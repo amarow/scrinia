@@ -31,12 +31,12 @@ export function ContextExportPage() {
         }
     }, [token]);
 
-    // Trigger preview automatically when tag or format changes
+    // Trigger preview automatically when format changes
     useEffect(() => {
-        if (apiKey && (batchTag || responseFormat)) {
+        if (apiKey && responseFormat) {
             handleFetchPreview();
         }
-    }, [batchTag, responseFormat, apiKey]);
+    }, [responseFormat, apiKey]);
 
     const getDynamicUrl = () => {
         if (!apiKey) return '';

@@ -1,12 +1,36 @@
 import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, Stack, Select, Badge, ActionIcon } from '@mantine/core';
 import { useAppStore } from '../store';
 import { useEffect, useState, useCallback } from 'react';
-import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconShieldLock, IconEye, IconPlus, IconCopy } from '@tabler/icons-react';
+import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconShieldLock, IconEye, IconPlus, IconCopy, IconX } from '@tabler/icons-react';
 import { FileViewer } from './FileViewer';
 import { translations } from '../i18n';
 import { authFetch, API_BASE } from '../store/utils';
 import React, { useRef } from 'react';
 import { notifications } from '@mantine/notifications';
+import { useDraggable } from '@dnd-kit/core';
+
+const DraggableSelection = ({ text, children, disabled }: { text: string, children: React.ReactNode, disabled?: boolean }) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: 'text-selection-draggable',
+        data: { type: 'TEXT_SELECTION', text },
+        disabled
+    });
+
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 9999,
+        opacity: 0.8,
+        cursor: 'grabbing'
+    } : {
+        cursor: disabled ? 'default' : 'grab'
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+            {children}
+        </div>
+    );
+};
 
 // Memoized sub-component to prevent re-renders of the HTML content which would lose selection
 const RedactedContent = React.memo(({ html, onSelectionChange, onRedactedClick }: { 
@@ -80,16 +104,11 @@ export function FilePreviewPanel() {
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'standard' | 'editor' | 'preview'>('standard');
 
-    // Force standard view in filter tab
-    useEffect(() => {
-        if (activeMainTab === 'filter') {
-            setViewMode('standard');
-        }
-    }, [activeMainTab]);
     const [redactedText, setRedactedText] = useState<string | null>(null);
     const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
     const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(null);
     const [hasSelection, setHasSelection] = useState(false);
+    const [selectionText, setSelectionText] = useState('');
     const [responseFormat, setResponseFormat] = useState<'text' | 'json'>('text');
     
     // Look up file in files list OR search results
@@ -138,10 +157,15 @@ export function FilePreviewPanel() {
         });
         setIsPrivacyModalOpen(true);
         
+        clearSelection();
+    };
+
+    const clearSelection = useCallback(() => {
         setHasSelection(false);
+        setSelectionText('');
         (window as any)._currentScriniaSelection = '';
         window.getSelection()?.removeAllRanges();
-    };
+    }, []);
 
     const fetchRedactedText = useCallback(() => {
         if (viewMode === 'standard' || !file || !token) return;
@@ -180,6 +204,11 @@ export function FilePreviewPanel() {
 
     const handleSelectionChange = useCallback((hasSel: boolean) => {
         setHasSelection(hasSel);
+        if (hasSel) {
+            setSelectionText((window as any)._currentScriniaSelection || '');
+        } else {
+            setSelectionText('');
+        }
     }, []);
 
     useEffect(() => {
@@ -420,27 +449,32 @@ export function FilePreviewPanel() {
                                         <Group align="flex-end" gap="md">
                                             {viewMode === 'editor' ? (
                                                 <>
-                                                    <Select
-                                                        label="Rule Set"
-                                                        size="xs"
-                                                        placeholder="Select rule set..."
-                                                        data={privacyProfiles.map(p => ({ value: p.id.toString(), label: p.name }))}
-                                                        value={selectedProfileId}
-                                                        onChange={setSelectedProfileId}
-                                                        style={{ width: 250 }}
-                                                    />
-                                                    <Button
-                                                        leftSection={<IconPlus size={16} />}
-                                                        variant="filled"
-                                                        size="xs"
-                                                        color="blue"
-                                                        disabled={!hasSelection}
-                                                        onClick={handleAddRuleFromSelection}
-                                                        style={{ marginBottom: '2px' }}
-                                                    >
-                                                        {t.add} Rule
-                                                    </Button>
-                                                </>
+                                                                                                            <Select
+                                                                                                            label="Rule Set"
+                                                                                                            size="xs"
+                                                                                                            placeholder="Select rule set..."
+                                                                                                            data={privacyProfiles.map(p => ({ value: p.id.toString(), label: p.name }))}
+                                                                                                            value={selectedProfileId}
+                                                                                                            onChange={setSelectedProfileId}
+                                                                                                            style={{ width: 250 }}
+                                                                                                        />
+                                                                                                        <DraggableSelection 
+                                                                                                            text={selectionText} 
+                                                                                                            disabled={!hasSelection}
+                                                                                                        >
+                                                                                                            <Button
+                                                                                                                leftSection={<IconPlus size={16} />}
+                                                                                                                variant="filled"
+                                                                                                                size="xs"
+                                                                                                                color="blue"
+                                                                                                                disabled={!hasSelection}
+                                                                                                                onClick={handleAddRuleFromSelection}
+                                                                                                                style={{ marginBottom: '2px' }}
+                                                                                                            >
+                                                                                                                {t.add} Rule
+                                                                                                            </Button>
+                                                                                                        </DraggableSelection>
+                                                                                                    </>
                                             ) : (
                                                 <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
                                                     <Select

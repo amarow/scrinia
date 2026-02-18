@@ -3,8 +3,8 @@ import { IconKey, IconShieldLock, IconPlus, IconDatabase, IconTag } from '@table
 import { useAppStore } from '../store';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { translations } from '../i18n';
-import { useEffect } from 'react';
-import { useDraggable } from '@dnd-kit/core';
+import { useEffect, useState } from 'react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 const DraggableItem = ({ id, type, name, children }: { id: string | number, type: string, name: string, children: React.ReactNode }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -21,6 +21,61 @@ const DraggableItem = ({ id, type, name, children }: { id: string | number, type
   return (
     <Box ref={setNodeRef} style={style} {...listeners} {...attributes}>
       {children}
+    </Box>
+  );
+};
+
+const DroppableRuleset = ({ profile, active, onClick }: { profile: any, active: boolean, onClick: () => void }) => {
+  const [nativeOver, setNativeOver] = useState(false);
+  const addPrivacyRule = useAppStore(state => state.addPrivacyRule);
+  
+  const { setNodeRef, isOver } = useDroppable({
+    id: `ruleset-drop-${profile.id}`,
+    data: { type: 'RULESET_TARGET', id: profile.id }
+  });
+
+  const handleNativeDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setNativeOver(false);
+      const text = e.dataTransfer.getData('text');
+      if (text && profile.id) {
+          addPrivacyRule(profile.id, {
+              type: 'LITERAL',
+              pattern: text,
+              replacement: '[REDACTED]'
+          });
+      }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+      if (!nativeOver) setNativeOver(true);
+  };
+
+  return (
+    <Box 
+      ref={setNodeRef} 
+      onDragEnter={() => setNativeOver(true)}
+      onDragOver={handleDragOver}
+      onDragLeave={() => setNativeOver(false)}
+      onDrop={handleNativeDrop}
+      style={{ 
+        borderRadius: '4px',
+        backgroundColor: (isOver || nativeOver) ? 'var(--mantine-color-blue-light)' : 'transparent',
+        transition: 'background-color 0.2s ease'
+      }}
+    >
+      <NavLink
+        label={<DraggableItem id={profile.id} type="RULESET" name={profile.name}>{profile.name}</DraggableItem>}
+        leftSection={<IconShieldLock size={14} color={(isOver || nativeOver) ? 'var(--mantine-color-blue-filled)' : undefined} />}
+        active={active}
+        onClick={onClick}
+        variant="light"
+        styles={{ label: { fontSize: '13px' } }}
+      />
     </Box>
   );
 };
@@ -120,14 +175,11 @@ export const DataSidebar = () => {
           
           <Stack gap={2}>
             {privacyProfiles.map(profile => (
-              <NavLink
-                key={profile.id}
-                label={<DraggableItem id={profile.id} type="RULESET" name={profile.name}>{profile.name}</DraggableItem>}
-                leftSection={<IconShieldLock size={14} />}
+              <DroppableRuleset 
+                key={profile.id} 
+                profile={profile} 
                 active={isRulesetActive && currentRulesetId === profile.id.toString()}
                 onClick={() => navigate(`/data/ruleset/${profile.id}`)}
-                variant="light"
-                styles={{ label: { fontSize: '13px' } }}
               />
             ))}
           </Stack>

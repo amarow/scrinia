@@ -94,7 +94,15 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
   deleteApiKey: async (id) => {
     try {
       const res = await authFetch(`${API_BASE}/api/keys/${id}`, get().token, { method: 'DELETE' });
-      if (res.ok) await get().fetchApiKeys();
+      if (res.ok) {
+        await get().fetchApiKeys();
+        const lang = get().language as 'en' | 'de';
+        notifications.show({
+            title: translations[lang].delete,
+            message: 'API Key deleted',
+            color: 'blue'
+        });
+      }
     } catch (e) {
       console.error("Failed to delete api key", e);
     }
@@ -166,6 +174,12 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
       if (res.ok) {
         await get().fetchPrivacyProfiles();
         await get().fetchApiKeys();
+        const lang = get().language as 'en' | 'de';
+        notifications.show({
+            title: translations[lang].delete,
+            message: 'Ruleset deleted',
+            color: 'blue'
+        });
       }
     } catch (e) {
       console.error("Failed to delete privacy profile", e);
@@ -188,7 +202,16 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
         method: 'POST',
         body: JSON.stringify(rule)
       });
-      if (res.ok) await get().fetchPrivacyProfiles(); 
+      if (res.ok) {
+          await get().fetchPrivacyProfiles();
+          set((state: any) => ({ privacyRefreshCounter: state.privacyRefreshCounter + 1 }));
+          const lang = get().language as 'en' | 'de';
+          notifications.show({
+              title: translations[lang].add,
+              message: 'Rule added to ruleset',
+              color: 'green'
+          });
+      }
     } catch (e) {
       console.error("Failed to add privacy rule", e);
     }

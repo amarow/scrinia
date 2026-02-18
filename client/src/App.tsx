@@ -50,6 +50,28 @@ export default function App() {
     const activeId = active.data.current?.id;
     const overId = over.data.current?.id;
 
+    console.log('[DND] End:', { activeType, overType, activeId, overId });
+
+    // RULESET TEXT DROP LOGIC (Add rule from selection)
+    if (activeType === 'TEXT_SELECTION' && overType === 'RULESET_TARGET') {
+        const text = active.data.current?.text;
+        const profileId = overId;
+        console.log('[DND] TEXT -> RULESET:', { text, profileId });
+        if (text && profileId) {
+            useAppStore.getState().addPrivacyRule(Number(profileId), {
+                type: 'LITERAL',
+                pattern: text,
+                replacement: '[REDACTED]'
+            });
+            // Clear selection after drop
+            window.getSelection()?.removeAllRanges();
+            (window as any)._currentScriniaSelection = '';
+            // We need to trigger a re-render for the 'hasSelection' state if possible, 
+            // but for now the notification will show success.
+        }
+        return;
+    }
+
     // DATA VIEW DND LOGIC
     if (overType === 'API_KEY_TARGET') {
         const apiKey = useAppStore.getState().apiKeys.find(k => k.id === overId);
@@ -139,6 +161,7 @@ export default function App() {
              <Button 
                variant="filled" 
                size="xs" 
+               color={activeDragItem.type === 'TEXT_SELECTION' ? 'blue' : undefined}
                style={{ cursor: 'grabbing', opacity: 0.9 }}
                rightSection={
                    (activeDragItem.type === 'FILE' && selectedFileIds.includes(activeDragItem.id) && selectedFileIds.length > 1) 
@@ -146,7 +169,9 @@ export default function App() {
                    : null
                }
              >
-                {activeDragItem.name}
+                {activeDragItem.type === 'TEXT_SELECTION' 
+                    ? `Add Rule: ${activeDragItem.text.substring(0, 20)}${activeDragItem.text.length > 20 ? '...' : ''}` 
+                    : activeDragItem.name}
              </Button>
           ) : null}
         </DragOverlay>

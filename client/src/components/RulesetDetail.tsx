@@ -4,6 +4,7 @@ import { IconPlus, IconTrash, IconCopy, IconShieldLock, IconPlayerPlay, IconChec
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
 import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
 import { authFetch, API_BASE } from '../store/utils';
 
 const PRESETS: Record<string, string> = {
@@ -74,6 +75,20 @@ export const RulesetDetail = ({ profileId }: { profileId: number }) => {
       });
   };
 
+  const handleDelete = () => {
+    modals.openConfirmModal({
+        title: t.deleteProfileTitle,
+        children: <Text size="sm">{t.areYouSure}</Text>,
+        labels: { confirm: t.delete, cancel: t.cancel },
+        confirmProps: { color: 'red' },
+        onConfirm: async () => {
+            const { deletePrivacyProfile } = useAppStore.getState();
+            await deletePrivacyProfile(profileId);
+            navigate('/data');
+        },
+    });
+  };
+
   if (!profile) return <Text>Ruleset not found</Text>;
 
   return (
@@ -86,13 +101,23 @@ export const RulesetDetail = ({ profileId }: { profileId: number }) => {
                     <Text size="xs" c="dimmed">{t.privacyDesc}</Text>
                 </div>
             </Group>
-            <Button 
-                onClick={handleSave} 
-                loading={isLoading}
-                leftSection={<IconCheck size={18} />}
-            >
-                {t.save}
-            </Button>
+            <Group gap="xs">
+                <Button 
+                    onClick={handleSave} 
+                    loading={isLoading}
+                    leftSection={<IconCheck size={18} />}
+                >
+                    {t.save}
+                </Button>
+                <ActionIcon 
+                    variant="light" 
+                    color="red" 
+                    size="lg"
+                    onClick={handleDelete}
+                >
+                    <IconTrash size={22} />
+                </ActionIcon>
+            </Group>
         </Group>
 
         <Paper withBorder p="md" radius="md">
@@ -128,7 +153,7 @@ export const RulesetDetail = ({ profileId }: { profileId: number }) => {
                     </thead>
                     <tbody>
                         {rules.map((rule, idx) => {
-                            const isHighlighted = highlightedRuleId === rule.id.toString();
+                            const isHighlighted = highlightedRuleId === rule.id?.toString();
                             return (
                             <tr 
                                 key={rule.id || rule.tempId || idx}
