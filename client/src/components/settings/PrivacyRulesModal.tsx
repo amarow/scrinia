@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Group, Stack, Text, Button, ActionIcon, Table, Switch, Modal, TextInput, Select } from '@mantine/core';
-import { IconPlus, IconTrash, IconCopy } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconCopy, IconCheck } from '@tabler/icons-react';
 import { useAppStore } from '../../store';
 import { translations } from '../../i18n';
+import { notifications } from '@mantine/notifications';
 
 const PRESETS: Record<string, string> = {
     'EMAIL': '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',

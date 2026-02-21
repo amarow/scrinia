@@ -1,10 +1,11 @@
 import { NavLink, Stack, Text, Group, ActionIcon, ScrollArea, Tooltip, Badge, Box, Divider } from '@mantine/core';
-import { IconKey, IconShieldLock, IconPlus, IconDatabase, IconTag } from '@tabler/icons-react';
+import { IconKey, IconShieldLock, IconPlus, IconTag } from '@tabler/icons-react';
 import { useAppStore } from '../store';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { translations } from '../i18n';
 import { useEffect, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { useShallow } from 'zustand/react/shallow';
 
 const DraggableItem = ({ id, type, name, children }: { id: string | number, type: string, name: string, children: React.ReactNode }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -80,8 +81,6 @@ const DroppableRuleset = ({ profile, active, onClick }: { profile: any, active: 
   );
 };
 
-import { useShallow } from 'zustand/react/shallow';
-
 // ... imports
 
 export const DataSidebar = () => {
@@ -127,7 +126,7 @@ export const DataSidebar = () => {
         <Stack gap="xs">
           <Group justify="space-between" px="xs">
             <Group gap="xs">
-              <IconKey size={16} c="blue" />
+              <IconKey size={16} color="var(--mantine-color-blue-filled)" />
               <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
                 {t.apiKeys}
               </Text>
@@ -138,7 +137,7 @@ export const DataSidebar = () => {
                 size="sm" 
                 onClick={async () => {
                   const key = await generateApiKeyString();
-                  await createApiKey(t.keyName + ' ' + (apiKeys.length + 1), 'all', [], key);
+                  await createApiKey(t.keyName + ' ' + (apiKeys.length + 1), 'all', [], key || undefined);
                   // Navigation will be handled by list update if we want, but better to navigate to the new key
                   fetchApiKeys();
                 }}
@@ -169,7 +168,7 @@ export const DataSidebar = () => {
         <Stack gap="xs">
           <Group justify="space-between" px="xs">
             <Group gap="xs">
-              <IconShieldLock size={16} c="green" />
+              <IconShieldLock size={16} color="var(--mantine-color-green-filled)" />
               <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
                 {t.privacy}
               </Text>
@@ -205,7 +204,7 @@ export const DataSidebar = () => {
         {/* TAGS SECTION */}
         <Stack gap="xs">
           <Group px="xs">
-            <IconTag size={16} c="orange" />
+            <IconTag size={16} color="var(--mantine-color-orange-filled)" />
             <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
               {t.tags}
             </Text>

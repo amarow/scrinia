@@ -7,16 +7,17 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { authFetch, API_BASE } from '../store/utils';
 
-const PRESETS: Record<string, string> = {
-    'EMAIL': '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
-    'IBAN': '[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}',
-    'IPV4': '\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b',
-    'PHONE': '(?:(?:phone|tel|mobile|mobil|telefon)\s*[:\-]?\s*)(?:\+?49|0)(?:\s*\d{2,5}\s*)(?:\d{3,9})'
-};
-
 import { useNavigate, useLocation } from 'react-router-dom';
 
+const PRESETS: Record<string, string> = {
+    'EMAIL': '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}',
+    'IBAN': '[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}([A-Z0-9]?){0,16}',
+    'IPV4': '\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b',
+    'PHONE': '(?:(?:phone|tel|mobile|mobil|telefon)\\s*[:\\-]?\\s*)(?:\\+?49|0)(?:\\s*\\d{2,5}\\s*)(?:\\d{3,9})'
+};
+
 export const RulesetDetail = ({ profileId }: { profileId: number }) => {
+  const navigate = useNavigate();
   const location = useLocation();
   const { 
     privacyProfiles, updatePrivacyProfile, fetchPrivacyRules, language, isLoading, token
@@ -95,7 +96,7 @@ export const RulesetDetail = ({ profileId }: { profileId: number }) => {
     <Stack gap="xl">
         <Group justify="space-between">
             <Group gap="xs">
-                <IconShieldLock size={28} c="green" />
+                <IconShieldLock size={28} color="var(--mantine-color-green-filled)" />
                 <div>
                     <Title order={2}>{t.privacyProfile}</Title>
                     <Text size="xs" c="dimmed">{t.privacyDesc}</Text>

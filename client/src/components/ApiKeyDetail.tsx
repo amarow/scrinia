@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Group, Stack, Text, Button, ActionIcon, TextInput, MultiSelect, Paper, Title, Divider, Badge, Select, LoadingOverlay, ScrollArea, Grid, Box, NumberInput, SegmentedControl } from '@mantine/core';
-import { IconKey, IconCheck, IconCopy, IconShieldLock, IconDatabase, IconSearch, IconFileText, IconBraces, IconEye, IconExternalLink, IconX, IconTrash } from '@tabler/icons-react';
+import { Group, Stack, Text, Button, ActionIcon, TextInput, Paper, Divider, Badge, Select, LoadingOverlay, SegmentedControl } from '@mantine/core';
+import { IconKey, IconCheck, IconCopy, IconShieldLock, IconSearch, IconEye, IconExternalLink, IconX, IconTrash } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
 import { notifications } from '@mantine/notifications';
@@ -13,8 +13,7 @@ import { useNavigate } from 'react-router-dom';
 export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   const navigate = useNavigate();
   const { 
-    apiKeys, updateApiKey, deleteApiKey, tags, privacyProfiles, language, isLoading, token,
-    fetchPrivacyRules, addPrivacyRule
+    apiKeys, updateApiKey, deleteApiKey, tags, privacyProfiles, language, isLoading, token
   } = useAppStore();
   const t = translations[language];
 
@@ -172,7 +171,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
         >
             <Group justify="space-between" align="flex-end" wrap="nowrap">
                 <Group align="flex-end" gap="xs" style={{ flex: 1 }}>
-                    <IconKey size={24} c="blue" style={{ marginBottom: 4 }} />
+                    <IconKey size={24} color="var(--mantine-color-blue-filled)" style={{ marginBottom: 4 }} />
                     <TextInput 
                         label={t.keyName}
                         size="xs"
@@ -190,7 +189,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
                                 variant="subtle" 
                                 size="xs"
                                 onClick={() => {
-                                    navigator.clipboard.writeText(apiKey.key);
+                                    navigator.clipboard.writeText(apiKey.key || '');
                                     notifications.show({ message: t.copied, color: 'green', icon: <IconCheck size={14} /> });
                                 }}
                             >

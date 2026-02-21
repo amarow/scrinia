@@ -324,7 +324,7 @@ export const Sidebar = () => {
               <Stack gap="xs">
                 <Group justify="space-between" px="xs">
                   <Group gap="xs">
-                    <IconDatabase size={16} c="blue" />
+                    <IconDatabase size={16} color="var(--mantine-color-blue-filled)" />
                     <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
                       {t.managedScopes}
                     </Text>
@@ -348,7 +348,7 @@ export const Sidebar = () => {
               {/* TAGS SECTION */}
               <Stack gap="xs">
                 <Group gap="xs" px="xs">
-                  <IconTag size={16} c="appleBlue" />
+                  <IconTag size={16} color="var(--mantine-color-blue-filled)" />
                   <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
                     {t.tags}
                   </Text>
@@ -383,7 +383,7 @@ export const Sidebar = () => {
               {/* QUICK RULESETS SECTION */}
               <Stack gap="xs" pb="xl">
                 <Group gap="xs" px="xs">
-                  <IconShieldLock size={16} c="green" />
+                  <IconShieldLock size={16} color="var(--mantine-color-green-filled)" />
                   <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>
                     {t.privacy} (Drop Target)
                   </Text>

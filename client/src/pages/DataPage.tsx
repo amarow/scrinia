@@ -26,10 +26,10 @@ export function DataPage() {
         return (
             <Center h="60vh">
                 <Stack align="center" gap="xs">
-                    <IconDatabase size={48} c="dimmed" stroke={1.5} />
+                    <IconDatabase size={48} color="gray" stroke={1.5} />
                     <Title order={3} c="dimmed">Data & API Management</Title>
                     <Group gap={4}>
-                        <IconClick size={16} c="dimmed" />
+                        <IconClick size={16} color="gray" />
                         <Text c="dimmed" size="sm">Select an API Key or Ruleset from the sidebar to manage it.</Text>
                     </Group>
                 </Stack>

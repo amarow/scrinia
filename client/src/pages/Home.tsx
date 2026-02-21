@@ -181,7 +181,7 @@ export function HomePage() {
                 <Group justify="space-between">
                     <Group gap="xl">
                         <Group gap="xs">
-                            <IconFiles size={20} c="blue" />
+                            <IconFiles size={20} color="var(--mantine-color-blue-filled)" />
                             <Text fw={700} size="sm">
                                 {filteredFiles.length} / {files.length} {t.files}
                             </Text>

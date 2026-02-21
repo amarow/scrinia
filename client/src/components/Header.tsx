@@ -57,7 +57,7 @@ export const Header = ({ opened, toggle }: HeaderProps) => {
             {logo}
           </Group>
 
-          <Tabs value={activeMainTab} onChange={handleTabChange} variant="pills" size="xs">
+          <Tabs value={activeMainTab} onChange={handleTabChange} variant="pills">
             <Tabs.List>
               <Tabs.Tab value="filter" leftSection={<IconFilter size={14} />}>
                 {t.filterTab}

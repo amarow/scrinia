@@ -1,6 +1,8 @@
 import type { StateCreator } from 'zustand';
 import type { ApiKey, PrivacyProfile, PrivacyRule } from '../types';
 import { API_BASE, authFetch } from '../utils';
+import { notifications } from '@mantine/notifications';
+import { translations } from '../../i18n';
 
 export interface SettingsSlice {
   apiKeys: ApiKey[];
