@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { shareRepository } from '../db/repository';
 import { authService, AuthRequest } from '../auth';
+import { syncService } from '../services/sync.service';
 
 export const ShareController = {
     async getAll(req: Request, res: Response) {
@@ -62,6 +63,23 @@ export const ShareController = {
                 tagIds,
                 cloudSync 
             });
+            res.json({ success: true });
+        } catch (e: any) {
+            res.status(500).json({ error: e.message });
+        }
+    },
+
+    async sync(req: Request, res: Response) {
+        try {
+            const userId = (req as AuthRequest).user!.id;
+            const { id } = req.params;
+            
+            const shares = await shareRepository.getAll(userId);
+            const share = shares.find(s => s.id === Number(id));
+            
+            if (!share) return res.status(404).json({ error: 'Share not found' });
+            
+            await syncService.syncShare(share);
             res.json({ success: true });
         } catch (e: any) {
             res.status(500).json({ error: e.message });

@@ -22,6 +22,7 @@ export interface SettingsSlice {
   createShare: (name: string, permissions?: string, tagIds?: number[], privacyProfileIds?: number[], key?: string) => Promise<Share | null>;
   updateShare: (id: number, updates: Partial<Pick<Share, 'name' | 'permissions' | 'tagIds' | 'privacyProfileIds' | 'cloudSync'>>) => Promise<void>;
   deleteShare: (id: number) => Promise<void>;
+  syncShare: (id: number) => Promise<boolean>;
 
   fetchPrivacyProfiles: () => Promise<void>;
   createPrivacyProfile: (name: string, rules?: Omit<PrivacyRule, 'id' | 'profileId'>[]) => Promise<PrivacyProfile | null>;
@@ -123,6 +124,25 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
       if (res.ok) await get().fetchShares();
     } catch (e) {
       console.error("Failed to update share", e);
+    }
+  },
+
+  syncShare: async (id) => {
+    set({ isLoading: true });
+    try {
+      const res = await authFetch(`${API_BASE}/api/shares/${id}/sync`, get().token, {
+        method: 'POST'
+      });
+      set({ isLoading: false });
+      if (res.ok) {
+          await get().fetchShares();
+          return true;
+      }
+      return false;
+    } catch (e) {
+      set({ isLoading: false });
+      console.error("Failed to sync share", e);
+      return false;
     }
   },
 

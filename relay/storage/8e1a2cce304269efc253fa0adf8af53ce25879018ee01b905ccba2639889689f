@@ -1,0 +1,36 @@
+# Zentraler Versorgungsschacht (Cavedio)
+
+**Position:** Rückwand (3m Seite), in einer Ecke.
+**Verlauf:** Vertikal vom Erdgeschoss bis zur Dachterrasse.
+
+## Belegung & Aufbau
+
+### Geplante Leitungen
+
+1. **Abwasser (Scarico):**
+   * Hauptstrang: DN 100 (100er Rohr).
+   * Wichtig: Entlüftung über Dach führen, damit es nicht gluckert/stinkt.
+2. **Lüftung (Aerazione forzata):**
+   * **NEU:** Zusätzliches 100er Rohr (DN 100) parallel zum Abwasser.
+   * **Zweck:** Abluft für innenliegende Räume (Bad EG) und Dunstabzug (Küche OG).
+   * **Auslass:** Durch das "Terrassenhäuschen" (Dachausstieg) nach draußen führen.
+   * *Hinweis:* Rückstauklappen einplanen, damit man im Bad nicht riecht, was in der Küche gekocht wird (und umgekehrt).
+3. **Frischwasser (Acqua):**
+   * Steigleitung kalt (und ggf. warm, falls Zentralboiler geplant).
+   * Material: Mehrschichtverbundrohr (Multistrato).
+4. **Elektrik (Elettricità):**
+   * Hauptsteigeleitung (Montante) vom Zähler/Kasten im EG zu den Etagenverteilern (falls vorhanden) oder Abzweigdosen.
+
+### Wichtige Hinweise zur Ausführung
+
+* **Trennung (Sicurezza):** Wasser und Strom müssen physisch getrennt sein.
+  * *Lösung:* Die Elektroleitungen müssen zwingend in geschlossenen Leerrohren (Corrugati) verlaufen.
+  * *Besser:* Eine Trennwand im Schacht (z.B. Blechprofil oder Trockenbau-Steg) zwischen dem Wasserbereich und dem Elektrobereich.
+* **Verkleidung:**
+  * Trockenbau (Cartongesso) – feuchtraumgeeignet (grüne Platten).
+  * Revisionsklappe in jeder Etage einplanen (für Absperrhähne oder zum Nachziehen von Kabeln).
+
+## Offene Fragen an Francesco/Alessandro
+
+* [ ] Ist der Schacht groß genug für das 100er Rohr + Dämmung + Elektro?
+* [ ] Wo genau sitzt der Durchbruch durch die Decken? (Statik der Deckenbalken beachten!)

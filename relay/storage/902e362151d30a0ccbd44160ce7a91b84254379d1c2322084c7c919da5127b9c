@@ -1,0 +1,19 @@
+# Bauvorhaben Bosa - Hauptübersicht
+
+Willkommen im Projekt Bosa.
+
+## 🗂 Zentrale Bereiche
+
+* [🔨 **Renovierungs-Planung**](./Renovierung/Index.md)
+  
+  * *Hier geht es zu den Details aller Gewerke, Budgets und To-Dos.*
+
+* [📄 **Projekt-Dokumentation (GEMINI)**](./GEMINI.md)
+  
+  * *Allgemeine Übersicht zur Dateistruktur und Nutzung dieses Ordners.*
+
+## 📂 Datei-Ablage
+
+* **Verträge/**: Kaufverträge, Vorverträge, Dokumente.
+* **pics/**: Fotos, Grundrisse, Videos.
+* **Kalkulationen**: Siehe `Bosa Kalkulationen.ods` oder `.pdf`.

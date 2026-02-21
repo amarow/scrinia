@@ -1,0 +1,43 @@
+# Renovierung - Detailplanung & Navigation
+
+Hier finden Sie die Detailplanungen zu den einzelnen Gewerken.
+
+## 💰 Budget Übersicht (aus Kalkulation)
+
+* **Renovierung Gesamt:** 37.000 €
+
+---
+
+## 📂 Gewerke & Bereiche
+
+### 🏗 Abriss & Rohbau
+
+* [🏗 **Abriss (Allgemein)**](./Abriss.md)
+* [🏚 **Erdgeschoss Abriss**](./Erdgeschoss.md) (500 €)
+* [🏗 **Gerüst & Lift**](./Geruest_Lift.md) (1.500 €)
+
+### ⚡ Installation & Technik
+
+* [⚡ **Elektrik**](./Elektrik.md) (2.000 €)
+* [💧 **Wasser Installation**](./Wasser.md) (3.000 €)
+* [🔧 **Versorgungsschacht**](./Versorgungsschacht.md) (2.000 €)
+
+### 🏠 Innenausbau & Räume
+
+* [🛁 **Badezimmer**](./Bad.md) (3.000 €)
+* [🥘 **Obergeschoss (Küche & Wohnen)**](./Obergeschoss.md) (3.500 €)
+* [🛏 **Schlafzimmer**](./Schlafzimmer.md) (2.000 €)
+* [🖥 **Büro / Gästezimmer**](./Buero_Schlafzimmer.md) (2.000 €)
+* [🪜 **Wendeltreppe**](./Wendeltreppe.md) (3.000 €)
+* [☀️ **Dachterrasse**](./Terrasse.md) (3.000 €)
+
+### 🛠 Organisation & Sonstiges
+
+* [🧰 **Werkzeug & Equipment**](./Werkzeug.md) (2.000 €)
+* [🏛 **Architekt & Abnahmen**](./Architekt.md) (4.000 €)
+* [📜 **Behörden**](./Behoerden.md) (500 €)
+* [🛡 **Puffer**](./Puffer.md) (5.000 €)
+
+---
+
+[⬅️ Zurück zur Hauptübersicht](../Index.md)

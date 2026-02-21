@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Group, Stack, Text, Button, ActionIcon, TextInput, Paper, Divider, Badge, Select, LoadingOverlay, SegmentedControl, Switch, Input } from '@mantine/core';
-import { IconKey, IconCheck, IconCopy, IconShieldLock, IconSearch, IconEye, IconExternalLink, IconX, IconTrash, IconCloudCheck, IconCloudX } from '@tabler/icons-react';
+import { IconKey, IconCheck, IconCopy, IconShieldLock, IconSearch, IconEye, IconExternalLink, IconX, IconTrash, IconCloudCheck, IconCloudX, IconCloudUpload } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
 import { notifications } from '@mantine/notifications';
@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 export const ShareDetail = ({ shareId }: { shareId: number }) => {
   const navigate = useNavigate();
   const { 
-    shares, updateShare, deleteShare, tags, privacyProfiles, language, isLoading, token
+    shares, updateShare, deleteShare, syncShare, tags, privacyProfiles, language, isLoading, token
   } = useAppStore();
   const t = translations[language];
 
@@ -277,6 +277,25 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
                     </Input.Wrapper>
                 </Group>
                 <Group gap="xs">
+                    {cloudSync && (
+                        <Button 
+                            variant="light" 
+                            color="teal" 
+                            size="xs"
+                            leftSection={<IconCloudUpload size={16} />}
+                            onClick={async () => {
+                                const success = await syncShare(shareId);
+                                if (success) {
+                                    notifications.show({ title: 'Sync', message: 'Manual synchronization complete', color: 'teal' });
+                                } else {
+                                    notifications.show({ title: 'Sync Failed', message: 'Relay server might be unreachable', color: 'red' });
+                                }
+                            }}
+                            loading={isLoading}
+                        >
+                            Sync
+                        </Button>
+                    )}
                     <Button 
                         size="xs"
                         onClick={handleSave} 

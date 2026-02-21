@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { db } from './db/client';
 import { crawlerService } from './services/crawler';
+import { syncService } from './services/sync.service';
 import { authenticateToken } from './auth';
 
 // Route Imports
@@ -60,4 +61,15 @@ app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
   // Initialize base service (worker pool)
   await crawlerService.init();
+
+  // Initialize Sync Service (every 5 minutes)
+  console.log('[SYNC] Initializing background sync...');
+  setInterval(() => {
+      syncService.syncAll().catch(console.error);
+  }, 5 * 60 * 1000);
+  
+  // Trigger initial sync after a short delay
+  setTimeout(() => {
+      syncService.syncAll().catch(console.error);
+  }, 10000);
 });

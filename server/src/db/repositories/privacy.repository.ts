@@ -64,7 +64,14 @@ export const privacyRepository = {
 
   async getRules(profileId: number) {
     const stmt = db.prepare('SELECT * FROM PrivacyRule WHERE profileId = ?');
-    return stmt.all(profileId);
+    return stmt.all(profileId) as any[];
+  },
+
+  async getProfileWithRules(profileId: number) {
+    const profile = db.prepare('SELECT * FROM PrivacyProfile WHERE id = ?').get(profileId) as any;
+    if (!profile) return null;
+    const rules = await this.getRules(profileId);
+    return { ...profile, rules };
   },
 
   async deleteRule(id: number) {

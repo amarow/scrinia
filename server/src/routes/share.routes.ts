@@ -9,5 +9,6 @@ router.get('/generate', authenticateToken, ShareController.generateKey);
 router.post('/', authenticateToken, ShareController.create);
 router.delete('/:id', authenticateToken, ShareController.delete);
 router.patch('/:id', authenticateToken, ShareController.update);
+router.post('/:id/sync', authenticateToken, ShareController.sync);
 
 export default router;
