@@ -84,7 +84,7 @@ export default function App() {
 
     // DATA VIEW DND LOGIC
     if (overType === 'SHARE_TARGET') {
-        const share = useAppStore.getState().shares.find(k => k.id === overId);
+        const share = useAppStore.getState().shares.find(k => `share-detail-${k.id}` === over.id);
         if (!share) return;
 
         if (activeType === 'TAG') {

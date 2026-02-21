@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Group, Stack, Text, Button, ActionIcon, TextInput, Paper, Divider, Badge, Select, LoadingOverlay, SegmentedControl } from '@mantine/core';
-import { IconKey, IconCheck, IconCopy, IconShieldLock, IconSearch, IconEye, IconExternalLink, IconX, IconTrash } from '@tabler/icons-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Group, Stack, Text, Button, ActionIcon, TextInput, Paper, Divider, Badge, Select, LoadingOverlay, SegmentedControl, Switch, Input } from '@mantine/core';
+import { IconKey, IconCheck, IconCopy, IconShieldLock, IconSearch, IconEye, IconExternalLink, IconX, IconTrash, IconCloudCheck, IconCloudX } from '@tabler/icons-react';
 import { useAppStore } from '../store';
 import { translations } from '../i18n';
 import { notifications } from '@mantine/notifications';
@@ -18,13 +18,14 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
   const t = translations[language];
 
   const { setNodeRef, isOver } = useDroppable({
-    id: `share-drop-${shareId}`,
+    id: `share-detail-${shareId}`,
     data: { type: 'SHARE_TARGET', id: shareId }
   });
 
   const [name, setName] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
+  const [cloudSync, setCloudSync] = useState(false);
   
   // Batch/Context Builder states
   const [batchTag, setBatchTag] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
       setName(share.name);
       setSelectedTags(share.tagIds ? share.tagIds.map(String) : []);
       setSelectedProfiles(share.privacyProfileIds ? share.privacyProfileIds.map(String) : []);
+      setCloudSync(share.cloudSync || false);
     }
   }, [shareId, shares]);
 
@@ -71,7 +73,8 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
     await updateShare(shareId, { 
         name, 
         tagIds, 
-        privacyProfileIds: profileIds 
+        privacyProfileIds: profileIds,
+        cloudSync
     });
 
     handleFetchPreview();
@@ -117,8 +120,6 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
     setPreviewLoading(true);
     setPreviewCount(null);
     try {
-        // For preview, we always want HTML highlighting if possible
-        // We use overrides to reflect the current UI state (tags, profiles) before saving
         let previewUrl = getDynamicUrl(true) + '&format=html';
 
         const res = await authFetch(previewUrl, token);
@@ -148,8 +149,6 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
 
   const getAvailableTags = () => {
     if (!share) return [];
-    
-    // Use the tags that are currently selected for this share in the UI
     return tags
         .filter(t => selectedTags.includes(t.id.toString()))
         .map(t => ({ value: t.name, label: t.name }));
@@ -160,59 +159,87 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
   return (
     <Stack gap="md" style={{ height: '100%', minHeight: 0 }}>
         <Paper 
-            ref={setNodeRef}
             withBorder 
             p="xs" 
             radius="md" 
-            bg={isOver ? 'var(--mantine-color-blue-light)' : 'var(--mantine-color-body)'}
-            style={{ transition: 'background-color 0.2s ease', border: isOver ? '1px solid var(--mantine-color-blue-filled)' : undefined, flexShrink: 0 }}
+            style={{ 
+                position: 'relative',
+                transition: 'background-color 0.2s ease', 
+                flexShrink: 0,
+                backgroundColor: isOver ? 'var(--mantine-color-blue-light)' : undefined,
+                borderColor: isOver ? 'var(--mantine-color-blue-filled)' : undefined
+            }}
         >
-            <Group justify="space-between" align="flex-end" wrap="nowrap">
-                <Group align="flex-end" gap="xs" style={{ flex: 1 }}>
-                    <IconKey size={24} color="var(--mantine-color-blue-filled)" style={{ marginBottom: 4 }} />
+            {/* DND Overlay - catches drops without blocking inputs when not dragging */}
+            <div 
+                ref={setNodeRef}
+                style={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    zIndex: isOver ? 10 : -1, // Only come to front when something is being dragged over or needed? 
+                    // Actually, better: always front but pointer-events none unless dragging.
+                    // But we want to catch the 'over' event.
+                }}
+            />
+
+            <Group justify="space-between" align="flex-end" wrap="nowrap" style={{ position: 'relative', zIndex: 1 }}>
+                <Group align="flex-end" gap="lg" style={{ flex: 1 }}>
+                    <IconKey size={32} color="var(--mantine-color-blue-filled)" style={{ marginBottom: 4 }} />
+                    
                     <TextInput 
                         label={t.keyName}
-                        size="xs"
+                        size="sm"
                         value={name}
                         onChange={(e) => setName(e.currentTarget.value)}
-                        style={{ width: 150 }}
+                        style={{ width: 180 }}
                     />
+
                     <TextInput 
                         label="Token"
-                        size="xs"
+                        size="sm"
                         value={share.key}
                         readOnly
                         rightSection={
                             <ActionIcon 
                                 variant="subtle" 
-                                size="xs"
+                                size="sm"
                                 onClick={() => {
                                     navigator.clipboard.writeText(share.key || '');
                                     notifications.show({ message: t.copied, color: 'green', icon: <IconCheck size={14} /> });
                                 }}
                             >
-                                <IconCopy size={12} />
+                                <IconCopy size={14} />
                             </ActionIcon>
                         }
-                        styles={{ input: { fontFamily: 'monospace', fontSize: '10px', width: 120 } }}
+                        styles={{ input: { fontFamily: 'monospace', fontSize: '11px', width: 140 } }}
                     />
 
-                    <Stack gap={2} style={{ flex: 1, minWidth: 200 }}>
-                        <Text size="xs" fw={500} c="dimmed">{t.tags}</Text>
-                        <Group gap={4}>
+                    <Input.Wrapper label={t.cloudSync}>
+                        <div style={{ height: 36, display: 'flex', alignItems: 'center' }}>
+                            <Switch 
+                                size="md"
+                                checked={cloudSync}
+                                onChange={(e) => setCloudSync(e.currentTarget.checked)}
+                                thumbIcon={cloudSync ? <IconCloudCheck size={14} /> : <IconCloudX size={14} />}
+                            />
+                        </div>
+                    </Input.Wrapper>
+
+                    <Input.Wrapper label={t.tags} style={{ flex: 1, minWidth: 220 }}>
+                        <Group gap={6} style={{ minHeight: 36, alignItems: 'center' }}>
                             {selectedTags.length > 0 ? selectedTags.map(id => {
                                 const tag = tags.find(t => t.id.toString() === id);
                                 return tag ? (
                                     <Badge 
                                         key={id} 
                                         variant="light" 
-                                        size="sm" 
+                                        size="lg" 
                                         color={tag.color || 'blue'}
                                         rightSection={
                                             <ActionIcon size="xs" variant="transparent" color="gray" onClick={() => {
                                                 setSelectedTags(prev => prev.filter(tId => tId !== id));
                                             }}>
-                                                <IconX size={10} />
+                                                <IconX size={12} />
                                             </ActionIcon>
                                         }
                                     >
@@ -221,25 +248,24 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
                                 ) : null;
                             }) : <Text size="xs" c="dimmed" fs="italic">Drag tags here</Text>}
                         </Group>
-                    </Stack>
+                    </Input.Wrapper>
 
-                    <Stack gap={2} style={{ flex: 1, minWidth: 200 }}>
-                        <Text size="xs" fw={500} c="dimmed">{t.privacy}</Text>
-                        <Group gap={4}>
+                    <Input.Wrapper label={t.privacy} style={{ flex: 1, minWidth: 220 }}>
+                        <Group gap={6} style={{ minHeight: 36, alignItems: 'center' }}>
                             {selectedProfiles.length > 0 ? selectedProfiles.map(id => {
                                 const profile = privacyProfiles.find(p => p.id.toString() === id);
                                 return profile ? (
                                     <Badge 
                                         key={id} 
                                         variant="outline" 
-                                        size="sm" 
+                                        size="lg" 
                                         color="green"
-                                        leftSection={<IconShieldLock size={10} />}
+                                        leftSection={<IconShieldLock size={12} />}
                                         rightSection={
                                             <ActionIcon size="xs" variant="transparent" color="gray" onClick={() => {
                                                 setSelectedProfiles(prev => prev.filter(pId => pId !== id));
                                             }}>
-                                                <IconX size={10} />
+                                                <IconX size={12} />
                                             </ActionIcon>
                                         }
                                     >
@@ -248,7 +274,7 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
                                 ) : null;
                             }) : <Text size="xs" c="dimmed" fs="italic">Drag rulesets here</Text>}
                         </Group>
-                    </Stack>
+                    </Input.Wrapper>
                 </Group>
                 <Group gap="xs">
                     <Button 
@@ -379,7 +405,7 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
             >
                 <LoadingOverlay visible={previewLoading} overlayProps={{ blur: 1 }} />
                 {previewContent ? (
-                    <div dangerouslySetInnerHTML={{ __html: responseFormat === 'json' ? previewContent : previewContent }} />
+                    <div dangerouslySetInnerHTML={{ __html: previewContent }} />
                 ) : (
                     <Text c="dimmed" ta="center" mt="xl">Adjust settings and click 'Test' to see the anonymized output.</Text>
                 )}

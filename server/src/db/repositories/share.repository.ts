@@ -119,6 +119,11 @@ export const shareRepository = {
     cloudSync?: boolean 
   }) {
     db.transaction(() => {
+      // 1. Verify ownership
+      const keyCheck = db.prepare('SELECT id FROM Share WHERE id = ? AND userId = ?').get(id, userId);
+      if (!keyCheck) throw new Error("Share not found or access denied");
+
+      // 2. Update main fields
       const fields = [];
       const values = [];
 
@@ -138,13 +143,11 @@ export const shareRepository = {
       if (fields.length > 0) {
         values.push(id);
         values.push(userId);
-        const stmt = db.prepare(`UPDATE Share SET \${fields.join(', ')} WHERE id = ? AND userId = ?`);
+        const stmt = db.prepare(`UPDATE Share SET ${fields.join(', ')} WHERE id = ? AND userId = ?`);
         stmt.run(...values);
       }
 
-      const keyCheck = db.prepare('SELECT id FROM Share WHERE id = ? AND userId = ?').get(id, userId);
-      if (!keyCheck) return;
-
+      // 3. Update related tables
       if (updates.privacyProfileIds !== undefined) {
         db.prepare('DELETE FROM SharePrivacyProfile WHERE shareId = ?').run(id);
         const profileStmt = db.prepare('INSERT INTO SharePrivacyProfile (shareId, privacyProfileId, sequence) VALUES (?, ?, ?)');
