@@ -13,12 +13,21 @@ import { DataSidebar } from './components/DataSidebar';
 import { Login } from './components/Login';
 import { PrivacyRulesModal } from './components/settings/PrivacyRulesModal';
 
+import { useShallow } from 'zustand/react/shallow';
+
 export default function App() {
   const [opened, { toggle }] = useDisclosure();
   const { 
     isAuthenticated, init, selectedFileIds, addTagToMultipleFiles, addTagToFile,
     activeMainTab 
-  } = useAppStore();
+  } = useAppStore(useShallow(state => ({
+    isAuthenticated: state.isAuthenticated,
+    init: state.init,
+    selectedFileIds: state.selectedFileIds,
+    addTagToMultipleFiles: state.addTagToMultipleFiles,
+    addTagToFile: state.addTagToFile,
+    activeMainTab: state.activeMainTab
+  })));
   
   const [activeDragItem, setActiveDragItem] = useState<any>(null);
 

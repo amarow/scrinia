@@ -40,7 +40,37 @@ exports.FsController = void 0;
 const fs = __importStar(require("fs/promises"));
 const path = __importStar(require("path"));
 const os_1 = __importDefault(require("os"));
+const child_process_1 = require("child_process");
+const util_1 = require("util");
+const execAsync = (0, util_1.promisify)(child_process_1.exec);
 exports.FsController = {
+    async pickDirectory(req, res) {
+        try {
+            let command = '';
+            if (process.platform === 'linux') {
+                command = 'zenity --file-selection --directory --title="Select Directory to Watch"';
+            }
+            else if (process.platform === 'win32') {
+                command = 'powershell -command "& { $App = New-Object -ComObject Shell.Application; $Folder = $App.BrowseForFolder(0, \'Select Directory to Watch\', 0); if ($Folder) { $Folder.Self.Path } }"';
+            }
+            else if (process.platform === 'darwin') {
+                command = 'osascript -e "POSIX path of (choose folder with prompt \\"Select Directory to Watch\\")"';
+            }
+            if (!command) {
+                return res.status(501).json({ error: 'Directory picker not supported on this platform' });
+            }
+            const { stdout } = await execAsync(command);
+            const selectedPath = stdout.trim();
+            if (!selectedPath)
+                return res.status(204).end(); // User cancelled
+            res.json({ path: selectedPath });
+        }
+        catch (e) {
+            if (e.code === 1)
+                return res.status(204).end(); // User cancelled zenity
+            res.status(500).json({ error: e.message });
+        }
+    },
     async list(req, res) {
         try {
             let dirPath = req.query.path;

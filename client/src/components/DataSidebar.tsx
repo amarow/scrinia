@@ -80,6 +80,10 @@ const DroppableRuleset = ({ profile, active, onClick }: { profile: any, active: 
   );
 };
 
+import { useShallow } from 'zustand/react/shallow';
+
+// ... imports
+
 export const DataSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,7 +91,18 @@ export const DataSidebar = () => {
     apiKeys, fetchApiKeys, privacyProfiles, fetchPrivacyProfiles, language, 
     generateApiKeyString, createApiKey, createPrivacyProfile,
     tags, fetchTags
-  } = useAppStore();
+  } = useAppStore(useShallow(state => ({
+    apiKeys: state.apiKeys,
+    fetchApiKeys: state.fetchApiKeys,
+    privacyProfiles: state.privacyProfiles,
+    fetchPrivacyProfiles: state.fetchPrivacyProfiles,
+    language: state.language,
+    generateApiKeyString: state.generateApiKeyString,
+    createApiKey: state.createApiKey,
+    createPrivacyProfile: state.createPrivacyProfile,
+    tags: state.tags,
+    fetchTags: state.fetchTags
+  })));
   const t = translations[language];
 
   // Manually extract IDs from path since DataSidebar is outside the Route context

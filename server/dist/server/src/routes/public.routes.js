@@ -5,6 +5,8 @@ const auth_1 = require("../auth");
 const PublicController_1 = require("../controllers/PublicController");
 const router = (0, express_1.Router)();
 router.get('/files', auth_1.authenticateAny, PublicController_1.PublicController.getFiles);
+router.get('/files/text', auth_1.authenticateAny, PublicController_1.PublicController.getAllFilesText);
+router.get('/files/json', auth_1.authenticateAny, PublicController_1.PublicController.getAllFilesJson);
 router.get('/tags', auth_1.authenticateAny, PublicController_1.PublicController.getTags);
 router.get('/search', auth_1.authenticateAny, PublicController_1.PublicController.search);
 router.get('/files/:id/text', auth_1.authenticateAny, PublicController_1.PublicController.getFileText);

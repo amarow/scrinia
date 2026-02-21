@@ -9,7 +9,7 @@ import { translations } from '../i18n';
 export function DataPage() {
     const { keyId, rulesetId } = useParams();
     const location = useLocation();
-    const { language } = useAppStore();
+    const language = useAppStore(state => state.language);
     const t = translations[language];
 
     const isKeyView = location.pathname.includes('/data/key/');

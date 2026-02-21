@@ -1,30 +1,59 @@
 import { Group, Text, Loader, Alert, Stack, Badge, Table, ActionIcon, Button, Center, Checkbox, Tooltip, LoadingOverlay, TextInput, Paper } from '@mantine/core';
-import { IconFiles, IconAlertCircle, IconX, IconHammer, IconRefresh, IconExternalLink, IconFolder, IconSearch, IconFilter } from '@tabler/icons-react';
-import { useState, useRef, useMemo } from 'react';
+import { IconFiles, IconAlertCircle, IconX, IconHammer, IconRefresh, IconExternalLink, IconFolder, IconSearch } from '@tabler/icons-react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FileRow } from '../components/DndComponents';
 import { useNavigate } from 'react-router-dom';
 import { translations } from '../i18n';
 import { FilePreviewPanel } from '../components/FilePreviewPanel';
+import { useShallow } from 'zustand/react/shallow';
 
 export function HomePage() {
-  console.log("[HomePage] Render cycle start");
+
   const { 
     files, isLoading, error, 
     activeScopeIds, selectedTagIds, 
     searchCriteria, searchResults, isSearching, setSearchCriteria, performSearch,
     selectedFileIds, toggleFileSelection, setFileSelection, clearFileSelection,
     removeTagFromFile, language, refreshAllScopes,
-    setPreviewFileId, previewFileId, openFile, openDirectory,
-    setFilteredFilesCount
-  } = useAppStore();
+    setPreviewFileId, previewFileId, openFile, openDirectory
+  } = useAppStore(useShallow(state => ({
+    files: state.files,
+    isLoading: state.isLoading,
+    error: state.error,
+    activeScopeIds: state.activeScopeIds,
+    selectedTagIds: state.selectedTagIds,
+    searchCriteria: state.searchCriteria,
+    searchResults: state.searchResults,
+    isSearching: state.isSearching,
+    setSearchCriteria: state.setSearchCriteria,
+    performSearch: state.performSearch,
+    selectedFileIds: state.selectedFileIds,
+    toggleFileSelection: state.toggleFileSelection,
+    setFileSelection: state.setFileSelection,
+    clearFileSelection: state.clearFileSelection,
+    removeTagFromFile: state.removeTagFromFile,
+    language: state.language,
+    refreshAllScopes: state.refreshAllScopes,
+    setPreviewFileId: state.setPreviewFileId,
+    previewFileId: state.previewFileId,
+    openFile: state.openFile,
+    openDirectory: state.openDirectory
+  })));
 
   const t = translations[language];
   const navigate = useNavigate();
   const [sortBy, setSortBy] = useState<'name' | 'size' | 'updatedAt'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [isReady, setIsReady] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+      // Defer heavy calculation to allow initial paint
+      const timer = requestAnimationFrame(() => setIsReady(true));
+      return () => cancelAnimationFrame(timer);
+  }, []);
 
   const handleSort = (field: 'name' | 'size' | 'updatedAt') => {
       if (sortBy === field) {
@@ -36,6 +65,8 @@ export function HomePage() {
   };
 
   const filteredFiles = useMemo(() => {
+    if (!isReady) return [];
+
     const { filename, content, directory, enabled } = searchCriteria;
     
     let sourceFiles = files;
@@ -53,7 +84,7 @@ export function HomePage() {
         }
     }
 
-    console.log(`[HomePage] Filtering ${sourceFiles.length} files...`);
+
     
     const result = sourceFiles.filter(file => {
       // Logic:
@@ -69,21 +100,22 @@ export function HomePage() {
       return matchesScope && matchesTag;
     });
 
-    // Update global count for header
-    setTimeout(() => setFilteredFilesCount(result.length), 0);
     return result;
-  }, [files, searchResults, searchCriteria, activeScopeIds, selectedTagIds, isSearching, setFilteredFilesCount]);
+  }, [files, searchResults, searchCriteria, activeScopeIds, selectedTagIds, isSearching, isReady]);
+
+
 
   const sortedFiles = useMemo(() => {
-    console.log(`[HomePage] Sorting ${filteredFiles.length} files...`);
     return [...filteredFiles].sort((a, b) => {
-      let valA: any = a[sortBy];
-      let valB: any = b[sortBy];
-
       if (sortBy === 'updatedAt') {
-          valA = new Date(a.updatedAt).getTime();
-          valB = new Date(b.updatedAt).getTime();
+          // Assuming ISO 8601 strings, direct string comparison is faster and correct
+          if (a.updatedAt < b.updatedAt) return sortOrder === 'asc' ? -1 : 1;
+          if (a.updatedAt > b.updatedAt) return sortOrder === 'asc' ? 1 : -1;
+          return 0;
       }
+
+      const valA = a[sortBy];
+      const valB = b[sortBy];
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
@@ -251,7 +283,7 @@ export function HomePage() {
                 position: 'relative'
             }}
             >
-            <LoadingOverlay visible={isLoading || isSearching} overlayProps={{ blur: 1 }} loaderProps={{ size: 'md', type: 'dots' }} />
+            <LoadingOverlay visible={isLoading || isSearching || !isReady} overlayProps={{ blur: 1 }} loaderProps={{ size: 'md', type: 'dots' }} />
             <Table verticalSpacing="xs" striped highlightOnHover style={{ tableLayout: 'fixed', minWidth: '100%' }}>
                 <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'var(--mantine-color-body)' }}>
                 <Table.Tr>
@@ -276,7 +308,7 @@ export function HomePage() {
                 </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                {filteredFiles.length === 0 && (isLoading || isSearching) ? (
+                {filteredFiles.length === 0 && (isLoading || isSearching || !isReady) ? (
                     <tr>
                         <td colSpan={5}>
                             <Center h={200}>
@@ -369,7 +401,7 @@ export function HomePage() {
                 </Table.Tbody>
             </Table>
             
-            {!isLoading && !isSearching && filteredFiles.length === 0 && (
+            {!isLoading && !isSearching && isReady && filteredFiles.length === 0 && (
                 <Stack align="center" py="xl">
                 <Text c="dimmed">{t.noFiles}</Text>
                 </Stack>

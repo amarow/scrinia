@@ -49,8 +49,25 @@ exports.fileService = {
         try {
             if (ext === '.pdf') {
                 const dataBuffer = await fs.readFile(filePath);
-                const data = await pdf(dataBuffer);
-                return data.text;
+                // Suppress annoying console warnings from pdf-parse/pdf.js (e.g. "Warning: TT: undefined function: 32")
+                const originalLog = console.log;
+                const originalWarn = console.warn;
+                const suppress = (...args) => {
+                    const msg = args.join(' ');
+                    if (msg.includes('Warning: TT: undefined function: 32'))
+                        return;
+                    originalLog.apply(console, args);
+                };
+                console.log = suppress;
+                console.warn = suppress;
+                try {
+                    const data = await pdf(dataBuffer);
+                    return data.text;
+                }
+                finally {
+                    console.log = originalLog;
+                    console.warn = originalWarn;
+                }
             }
             if (ext === '.docx') {
                 const result = await mammoth_1.default.extractRawText({ path: filePath });

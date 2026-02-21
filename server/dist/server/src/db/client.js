@@ -19,8 +19,9 @@ if (!fs_1.default.existsSync(dbDir)) {
     fs_1.default.mkdirSync(dbDir, { recursive: true });
 }
 exports.db = new better_sqlite3_1.default(dbPath);
-// Enable WAL mode for better concurrency
+// Enable WAL mode and foreign keys
 exports.db.pragma('journal_mode = WAL');
+exports.db.pragma('foreign_keys = ON');
 // Initialize Schema only in main thread
 if (worker_threads_1.isMainThread) {
     const schema = `

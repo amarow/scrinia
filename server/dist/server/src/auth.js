@@ -66,6 +66,10 @@ const authenticateApiKey = async (req, res, next) => {
             key = authHeader.substring(7);
         }
     }
+    // Also check query parameter for direct browser access
+    if (!key && req.query.apiKey) {
+        key = req.query.apiKey;
+    }
     if (!key)
         return res.status(401).json({ error: 'API key missing' });
     const apiKeyRecord = await repository_1.apiKeyRepository.verify(key);
@@ -103,15 +107,40 @@ const authenticateToken = (req, res, next) => {
 exports.authenticateToken = authenticateToken;
 const authenticateAny = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const apiKeyHeader = req.headers['x-api-key'];
-    if (apiKeyHeader || (authHeader && authHeader.startsWith('Bearer '))) {
-        const token = authHeader && authHeader.split(' ')[1];
-        // Simple check: if it has 3 parts separated by dots, it's likely a JWT
-        if (token && token.split('.').length === 3) {
-            return (0, exports.authenticateToken)(req, res, next);
-        }
+    const token = authHeader && authHeader.split(' ')[1];
+    // 1. Try JWT first (UI access)
+    if (token && token.split('.').length === 3) {
+        jsonwebtoken_1.default.verify(token, SECRET_KEY, async (err, user) => {
+            if (!err) {
+                req.user = user;
+                // If we also have an API Key in query, load its metadata but keep the user
+                const apiKeyQuery = req.query.apiKey;
+                if (apiKeyQuery) {
+                    const apiKeyRecord = await repository_1.apiKeyRepository.verify(apiKeyQuery);
+                    if (apiKeyRecord) {
+                        req.apiKey = {
+                            id: apiKeyRecord.id,
+                            name: apiKeyRecord.name,
+                            permissions: apiKeyRecord.permissions,
+                            privacyProfileIds: apiKeyRecord.privacyProfileIds
+                        };
+                    }
+                }
+                return next();
+            }
+            // If JWT failed but we have an API Key, try API Key
+            if (req.headers['x-api-key'] || req.query.apiKey) {
+                return (0, exports.authenticateApiKey)(req, res, next);
+            }
+            return res.status(403).json({ error: 'Invalid token' });
+        });
+    }
+    else if (req.headers['x-api-key'] || req.query.apiKey || (authHeader && authHeader.startsWith('Bearer '))) {
+        // 2. Fallback to API Key
         return (0, exports.authenticateApiKey)(req, res, next);
     }
-    return (0, exports.authenticateToken)(req, res, next);
+    else {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
 };
 exports.authenticateAny = authenticateAny;

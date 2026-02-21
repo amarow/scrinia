@@ -1,7 +1,8 @@
-import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, Stack, Select, Badge, ActionIcon } from '@mantine/core';
+import { Text, LoadingOverlay, Button, Group, Center, Table, Paper, Stack, Select, ActionIcon } from '@mantine/core';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../store';
 import { useEffect, useState, useCallback } from 'react';
-import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconShieldLock, IconEye, IconPlus, IconCopy, IconX } from '@tabler/icons-react';
+import { IconExternalLink, IconFileUnknown, IconArrowLeft, IconFolder, IconPlus, IconCopy } from '@tabler/icons-react';
 import { FileViewer } from './FileViewer';
 import { translations } from '../i18n';
 import { authFetch, API_BASE } from '../store/utils';
@@ -10,7 +11,7 @@ import { notifications } from '@mantine/notifications';
 import { useDraggable } from '@dnd-kit/core';
 
 const DraggableSelection = ({ text, children, disabled }: { text: string, children: React.ReactNode, disabled?: boolean }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'text-selection-draggable',
         data: { type: 'TEXT_SELECTION', text },
         disabled
@@ -89,14 +90,32 @@ const RedactedContent = React.memo(({ html, onSelectionChange, onRedactedClick }
     );
 }, (prev, next) => prev.html === next.html);
 
-export function FilePreviewPanel() {
+export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
     const { 
         previewFileId, setPreviewFileId, files, searchResults, 
         token, openFile, openDirectory, language,
         privacyProfiles, fetchPrivacyProfiles, apiKeys, fetchApiKeys,
         setEditingRule, fetchPrivacyRules, setIsPrivacyModalOpen,
-        privacyRefreshCounter, tags, fetchTags, activeMainTab
-    } = useAppStore();
+        privacyRefreshCounter, activeMainTab
+    } = useAppStore(useShallow(state => ({
+        previewFileId: state.previewFileId,
+        setPreviewFileId: state.setPreviewFileId,
+        files: state.files,
+        searchResults: state.searchResults,
+        token: state.token,
+        openFile: state.openFile,
+        openDirectory: state.openDirectory,
+        language: state.language,
+        privacyProfiles: state.privacyProfiles,
+        fetchPrivacyProfiles: state.fetchPrivacyProfiles,
+        apiKeys: state.apiKeys,
+        fetchApiKeys: state.fetchApiKeys,
+        setEditingRule: state.setEditingRule,
+        fetchPrivacyRules: state.fetchPrivacyRules,
+        setIsPrivacyModalOpen: state.setIsPrivacyModalOpen,
+        privacyRefreshCounter: state.privacyRefreshCounter,
+        activeMainTab: state.activeMainTab
+    })));
     const t = translations[language];
     const [zipContent, setZipContent] = useState<any[] | null>(null);
     const [selectedZipEntry, setSelectedZipEntry] = useState<string | null>(null);
@@ -270,25 +289,7 @@ export function FilePreviewPanel() {
 
     if (!file) return null;
 
-    // Filter tags based on selected API Key permissions
-    const getAvailableTagsForSelectedKey = () => {
-        const apiKey = apiKeys.find(k => k.id.toString() === selectedApiKeyId);
-        if (!apiKey) return [];
-        
-        // If 'all' permission is present, return all tags
-        if (apiKey.permissions.includes('all')) {
-            return tags.map(t => ({ value: t.name, label: t.name }));
-        }
 
-        // Filter tags by ID if permission like 'tag:ID' exists
-        const allowedTagIds = apiKey.permissions
-            .filter(p => p.startsWith('tag:'))
-            .map(p => parseInt(p.split(':')[1]));
-
-        return tags
-            .filter(t => allowedTagIds.includes(t.id))
-            .map(t => ({ value: t.name, label: t.name }));
-    };
 
     // Main file URL
     const fileUrl = `${API_BASE}/api/files/${file.id}/content?token=${token}`;
@@ -516,7 +517,7 @@ export function FilePreviewPanel() {
                                                                     variant="subtle" 
                                                                     onClick={() => {
                                                                         navigator.clipboard.writeText(getDynamicUrl());
-                                                                        notifications.show({ message: 'URL copied to clipboard', color: 'blue', size: 'xs' });
+                                                                        notifications.show({ message: 'URL copied to clipboard', color: 'blue' });
                                                                     }}
                                                                 >
                                                                     <IconCopy size={14} />
@@ -580,4 +581,4 @@ export function FilePreviewPanel() {
             </div>
         </Paper>
     );
-}
+});

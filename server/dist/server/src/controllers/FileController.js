@@ -35,9 +35,9 @@ exports.FileController = {
                 const profileIds = Array.isArray(profileId)
                     ? profileId.map(id => Number(id))
                     : [Number(profileId)];
-                text = await privacy_1.privacyService.redactWithMultipleProfiles(text, profileIds);
+                text = await privacy_1.privacyService.redactWithMultipleProfiles(text, profileIds, true);
             }
-            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Type', 'text/html');
             res.send(text);
         }
         catch (e) {

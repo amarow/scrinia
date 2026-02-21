@@ -22,11 +22,13 @@ const public_routes_1 = __importDefault(require("./routes/public.routes"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
 console.log("!!! SERVER STARTUP - MODULAR ROUTER VERSION " + Date.now() + " !!!");
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    exposedHeaders: ['X-File-Count']
+}));
 app.use(express_1.default.json({ limit: '50mb' }));
 // --- Public Routes ---
 app.get('/', (req, res) => {
-    res.send('Tagzilla Backend is running!');
+    res.send('Scrinia Backend is running!');
 });
 // --- Register Modular Routes ---
 app.use('/api', auth_routes_1.default);
