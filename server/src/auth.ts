@@ -4,18 +4,19 @@ import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db/client';
 import { ensureSystemTags } from './db/user';
-import { apiKeyRepository } from './db/repository';
+import { shareRepository } from './db/repository';
 import { crawlerService } from './services/crawler';
-import type { User, ApiKey } from '@shared/types';
+import type { User, Share } from '@shared/types';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'super-secret-key-change-me';
 
 export interface AuthRequest extends Request {
   user?: User;
-  apiKey?: {
+  share?: {
     id: number;
     name: string;
     permissions: string[];
+    tagIds: number[];
     privacyProfileIds: number[];
   };
 }
@@ -78,7 +79,7 @@ export const authService = {
   }
 };
 
-export const authenticateApiKey = async (req: Request, res: Response, next: NextFunction) => {
+export const authenticateShare = async (req: Request, res: Response, next: NextFunction) => {
   let key = req.headers['x-api-key'] as string;
   
   if (!key) {
@@ -93,21 +94,22 @@ export const authenticateApiKey = async (req: Request, res: Response, next: Next
     key = req.query.apiKey as string;
   }
 
-  if (!key) return res.status(401).json({ error: 'API key missing' });
+  if (!key) return res.status(401).json({ error: 'Authentication (Share Token) missing' });
 
-  const apiKeyRecord = await apiKeyRepository.verify(key);
-  if (!apiKeyRecord) return res.status(403).json({ error: 'Invalid API key' });
+  const shareRecord = await shareRepository.verify(key);
+  if (!shareRecord) return res.status(403).json({ error: 'Invalid Share token' });
 
-  (req as AuthRequest).user = { id: apiKeyRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
-  (req as AuthRequest).apiKey = {
-    id: apiKeyRecord.id,
-    name: apiKeyRecord.name,
-    permissions: apiKeyRecord.permissions,
-    privacyProfileIds: apiKeyRecord.privacyProfileIds
+  (req as AuthRequest).user = { id: shareRecord.userId, username: 'api_user' }; // Map to user for repository compatibility
+  (req as AuthRequest).share = {
+    id: shareRecord.id,
+    name: shareRecord.name,
+    permissions: shareRecord.permissions,
+    tagIds: shareRecord.tagIds,
+    privacyProfileIds: shareRecord.privacyProfileIds
   };
   
   // Trigger crawler for this user (background)
-  crawlerService.initUser(apiKeyRecord.userId).catch(console.error);
+  crawlerService.initUser(shareRecord.userId).catch(console.error);
 
   next();
 };
@@ -143,31 +145,32 @@ export const authenticateAny = (req: Request, res: Response, next: NextFunction)
       if (!err) {
         (req as AuthRequest).user = user;
         
-        // If we also have an API Key in query, load its metadata but keep the user
-        const apiKeyQuery = req.query.apiKey as string;
-        if (apiKeyQuery) {
-            const apiKeyRecord = await apiKeyRepository.verify(apiKeyQuery);
-            if (apiKeyRecord) {
-                (req as AuthRequest).apiKey = {
-                    id: apiKeyRecord.id,
-                    name: apiKeyRecord.name,
-                    permissions: apiKeyRecord.permissions,
-                    privacyProfileIds: apiKeyRecord.privacyProfileIds
+        // If we also have a Share Key in query, load its metadata but keep the user
+        const shareQuery = req.query.apiKey as string;
+        if (shareQuery) {
+            const shareRecord = await shareRepository.verify(shareQuery);
+            if (shareRecord) {
+                (req as AuthRequest).share = {
+                    id: shareRecord.id,
+                    name: shareRecord.name,
+                    permissions: shareRecord.permissions,
+                    tagIds: shareRecord.tagIds,
+                    privacyProfileIds: shareRecord.privacyProfileIds
                 };
             }
         }
         return next();
       }
       
-      // If JWT failed but we have an API Key, try API Key
+      // If JWT failed but we have a Share Token, try it
       if (req.headers['x-api-key'] || req.query.apiKey) {
-        return authenticateApiKey(req, res, next);
+        return authenticateShare(req, res, next);
       }
       return res.status(403).json({ error: 'Invalid token' });
     });
   } else if (req.headers['x-api-key'] || req.query.apiKey || (authHeader && authHeader.startsWith('Bearer '))) {
-    // 2. Fallback to API Key
-    return authenticateApiKey(req, res, next);
+    // 2. Fallback to Share Token
+    return authenticateShare(req, res, next);
   } else {
     return res.status(401).json({ error: 'Authentication required' });
   }

@@ -265,17 +265,19 @@ export const crawlerService = {
 
                         // Optimization: Check if file already exists with same mtime and size
                         // AND check if content is indexed (for supported files)
+                        // AND check if hash is already present
                         const existing = fileRepository.getFileMinimal(scopeId, fullPath);
                         const ext = path.extname(fullPath).toLowerCase();
                         
                         // Check if we SHOULD have content for this file
                         const isAllowed = allowedExtensions.includes(ext);
-                        const isSupportedType = ['.txt', '.md', '.markdown', '.json', '.pdf', '.docx', '.odt', '.xml', '.html', '.ts', '.js'].includes(ext);
+                        const isSupportedType = ['.txt', '.md', '.markdown', '.json', '.pdf', '.docx', '.odt', '.xml', '.html', '.ts', '.js', '.jsx', '.tsx', '.css', '.scss', '.yaml', '.yml', '.sql', '.env'].includes(ext);
                         
                         // Treat as new if content is missing for supported types that are allowed
                         const contentMissing = isAllowed && isSupportedType && (existing && !existing.hasContent);
+                        const hashMissing = existing && !existing.hash;
 
-                        if (existing && existing.updatedAt === mtimeStr && existing.size === stats.size && !contentMissing) {
+                        if (existing && existing.updatedAt === mtimeStr && existing.size === stats.size && !contentMissing && !hashMissing) {
                             skippedCount++;
                             fileCount++; // Still count as "processed" in total
                             foundFileIds.push(existing.id);
@@ -287,27 +289,27 @@ export const crawlerService = {
                             });
                             foundFileIds.push(fileId);
                             
-                            // Limit: 20MB for binary, 5MB for text
-                            const maxSize = (ext === '.pdf' || ext === '.docx' || ext === '.odt') ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
-
-                            if (allowedExtensions.includes(ext) && stats.size < maxSize) {
-                                pendingWorkerTasks++;
-                                
-                                // Offload to worker
-                                processFileWithWorker(fullPath, ext, fileId).then(async (result) => {
-                                    if (result.text) {
-                                        try {
-                                            await searchRepository.indexContent(fileId, result.text);
-                                        } catch (err) {
-                                            console.error(`[CRAWLER] Failed to index content for ${fullPath}:`, err);
-                                        }
+                            // We now ALWAYS want the hash for Relay
+                            pendingWorkerTasks++;
+                            
+                            // Offload to worker
+                            processFileWithWorker(fullPath, ext, fileId).then(async (result: any) => {
+                                if (result.hash) {
+                                    await fileRepository.updateHash(fileId, result.hash);
+                                }
+                                if (result.text) {
+                                    try {
+                                        await searchRepository.indexContent(fileId, result.text);
+                                    } catch (err) {
+                                        console.error(`[CRAWLER] Failed to index content for ${fullPath}:`, err);
                                     }
-                                }).catch(err => {
-                                    console.error(`[CRAWLER] Worker error for ${fullPath}:`, err);
-                                }).finally(() => {
-                                    pendingWorkerTasks--;
-                                });
-                            }
+                                }
+                            }).catch(err => {
+                                console.error(`[CRAWLER] Worker error for ${fullPath}:`, err);
+                            }).finally(() => {
+                                pendingWorkerTasks--;
+                            });
+                            
                             fileCount++;
                         }
                         

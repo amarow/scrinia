@@ -100,7 +100,7 @@ export const createAuthSlice: StateCreator<any, [], [], AuthSlice> = (set, get) 
   logout: () => {
       set({ 
         token: null, user: null, isAuthenticated: false, files: [], scopes: [], 
-        tags: [], selectedFileIds: [], apiKeys: [], privacyProfiles: [] 
+        tags: [], selectedFileIds: [], shares: [], privacyProfiles: [] 
       });
   },
 });

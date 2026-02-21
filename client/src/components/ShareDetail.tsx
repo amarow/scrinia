@@ -10,16 +10,16 @@ import { useDroppable } from '@dnd-kit/core';
 
 import { useNavigate } from 'react-router-dom';
 
-export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
+export const ShareDetail = ({ shareId }: { shareId: number }) => {
   const navigate = useNavigate();
   const { 
-    apiKeys, updateApiKey, deleteApiKey, tags, privacyProfiles, language, isLoading, token
+    shares, updateShare, deleteShare, tags, privacyProfiles, language, isLoading, token
   } = useAppStore();
   const t = translations[language];
 
   const { setNodeRef, isOver } = useDroppable({
-    id: `apikey-drop-${apiKeyId}`,
-    data: { type: 'API_KEY_TARGET', id: apiKeyId }
+    id: `share-drop-${shareId}`,
+    data: { type: 'SHARE_TARGET', id: shareId }
   });
 
   const [name, setName] = useState('');
@@ -35,22 +35,22 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  const apiKey = apiKeys.find(k => k.id === apiKeyId);
+  const share = shares.find(k => k.id === shareId);
 
   useEffect(() => {
-    if (apiKey) {
-      setName(apiKey.name);
-      setSelectedTags(apiKey.permissions.filter(p => p.startsWith('tag:')).map(p => p.split(':')[1]));
-      setSelectedProfiles(apiKey.privacyProfileIds ? apiKey.privacyProfileIds.map(String) : []);
+    if (share) {
+      setName(share.name);
+      setSelectedTags(share.tagIds ? share.tagIds.map(String) : []);
+      setSelectedProfiles(share.privacyProfileIds ? share.privacyProfileIds.map(String) : []);
     }
-  }, [apiKeyId, apiKeys]);
+  }, [shareId, shares]);
 
   // Trigger preview automatically when format changes or key changes
   useEffect(() => {
-    if (apiKey) {
+    if (share) {
         handleFetchPreview();
     }
-  }, [apiKeyId, responseFormat]);
+  }, [shareId, responseFormat]);
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -65,14 +65,12 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   };
 
   const handleSave = async () => {
-    const perms = selectedTags.length > 0 
-        ? selectedTags.map(id => `tag:${id}`).join(',')
-        : 'files:read,tags:read';
+    const tagIds = selectedTags.map(id => parseInt(id));
     const profileIds = selectedProfiles.map(id => parseInt(id));
     
-    await updateApiKey(apiKeyId, { 
+    await updateShare(shareId, { 
         name, 
-        permissions: perms as any, 
+        tagIds, 
         privacyProfileIds: profileIds 
     });
 
@@ -80,7 +78,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
     
     notifications.show({
         title: t.save,
-        message: 'API Key updated successfully',
+        message: 'Share updated successfully',
         color: 'green',
         icon: <IconCheck size={16} />
     });
@@ -93,16 +91,16 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
         labels: { confirm: t.delete, cancel: t.cancel },
         confirmProps: { color: 'red' },
         onConfirm: async () => {
-            await deleteApiKey(apiKeyId);
+            await deleteShare(shareId);
             navigate('/data');
         },
     });
   };
 
   const getDynamicUrl = (useOverrides = false) => {
-    if (!apiKey) return '';
+    if (!share) return '';
     let endpoint = responseFormat === 'json' ? 'json' : 'text';
-    let url = `${API_BASE}/api/v1/files/${endpoint}?apiKey=${apiKey.key}&limit=${batchLimit}`;
+    let url = `${API_BASE}/api/v1/files/${endpoint}?apiKey=${share.key}&limit=${batchLimit}`;
     if (batchTag) url += `&tag=${encodeURIComponent(batchTag)}`;
     if (batchQuery) url += `&q=${encodeURIComponent(batchQuery)}`;
     
@@ -115,7 +113,7 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   };
 
   const handleFetchPreview = async () => {
-    if (!apiKey || !token) return;
+    if (!share || !token) return;
     setPreviewLoading(true);
     setPreviewCount(null);
     try {
@@ -149,15 +147,15 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
   };
 
   const getAvailableTags = () => {
-    if (!apiKey) return [];
+    if (!share) return [];
     
-    // Use the tags that are currently selected for this API key in the UI
+    // Use the tags that are currently selected for this share in the UI
     return tags
         .filter(t => selectedTags.includes(t.id.toString()))
         .map(t => ({ value: t.name, label: t.name }));
   };
 
-  if (!apiKey) return <Text>API Key not found</Text>;
+  if (!share) return <Text>Share not found</Text>;
 
   return (
     <Stack gap="md" style={{ height: '100%', minHeight: 0 }}>
@@ -182,14 +180,14 @@ export const ApiKeyDetail = ({ apiKeyId }: { apiKeyId: number }) => {
                     <TextInput 
                         label="Token"
                         size="xs"
-                        value={apiKey.key}
+                        value={share.key}
                         readOnly
                         rightSection={
                             <ActionIcon 
                                 variant="subtle" 
                                 size="xs"
                                 onClick={() => {
-                                    navigator.clipboard.writeText(apiKey.key || '');
+                                    navigator.clipboard.writeText(share.key || '');
                                     notifications.show({ message: t.copied, color: 'green', icon: <IconCheck size={14} /> });
                                 }}
                             >

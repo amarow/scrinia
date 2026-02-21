@@ -7,6 +7,7 @@ import { Routes, Route } from 'react-router-dom';
 import { HomePage } from './pages/Home';
 import { SettingsPage } from './pages/Settings';
 import { DataPage } from './pages/DataPage';
+import { ContextExportPage } from './pages/ContextExport';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { DataSidebar } from './components/DataSidebar';
@@ -82,27 +83,25 @@ export default function App() {
     }
 
     // DATA VIEW DND LOGIC
-    if (overType === 'API_KEY_TARGET') {
-        const apiKey = useAppStore.getState().apiKeys.find(k => k.id === overId);
-        if (!apiKey) return;
+    if (overType === 'SHARE_TARGET') {
+        const share = useAppStore.getState().shares.find(k => k.id === overId);
+        if (!share) return;
 
         if (activeType === 'TAG') {
-            const tagId = activeId;
-            const currentTags = apiKey.permissions.filter(p => p.startsWith('tag:')).map(p => p.split(':')[1]);
-            if (!currentTags.includes(String(tagId))) {
-                const newPerms = [...apiKey.permissions, `tag:${tagId}`].join(',');
-                // No need to update store yet, ApiKeyDetail will handle its own state
-                // But we need a way to tell the component. For now, we update the store.
-                useAppStore.getState().updateApiKey(apiKey.id, { permissions: newPerms as any });
+            const tagId = Number(activeId);
+            const currentTags = share.tagIds || [];
+            if (!currentTags.includes(tagId)) {
+                const newTags = [...currentTags, tagId];
+                useAppStore.getState().updateShare(share.id, { tagIds: newTags });
             }
         }
 
         if (activeType === 'RULESET') {
-            const rulesetId = activeId;
-            const currentProfiles = apiKey.privacyProfileIds || [];
-            if (!currentProfiles.includes(Number(rulesetId))) {
-                const newProfiles = [...currentProfiles, Number(rulesetId)];
-                useAppStore.getState().updateApiKey(apiKey.id, { privacyProfileIds: newProfiles });
+            const rulesetId = Number(activeId);
+            const currentProfiles = share.privacyProfileIds || [];
+            if (!currentProfiles.includes(rulesetId)) {
+                const newProfiles = [...currentProfiles, rulesetId];
+                useAppStore.getState().updateShare(share.id, { privacyProfileIds: newProfiles });
             }
         }
         return;
@@ -158,8 +157,9 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/data" element={<DataPage />} />
-              <Route path="/data/key/:keyId" element={<DataPage />} />
+              <Route path="/data/share/:shareId" element={<DataPage />} />
               <Route path="/data/ruleset/:rulesetId" element={<DataPage />} />
+              <Route path="/export/:shareId" element={<ContextExportPage />} />
           </Routes>
         </AppShell.Main>
         

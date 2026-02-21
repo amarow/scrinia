@@ -6,6 +6,7 @@ export interface FileHandle {
   extension: string;
   size: number;
   mimeType: string | null;
+  hash: string | null;
   updatedAt: string;
   tags: Tag[];
 }
@@ -34,13 +35,16 @@ export interface User {
   username: string;
 }
 
-export interface ApiKey {
+export interface Share {
   id: number;
   userId?: number;
   name: string;
   key?: string;
   permissions: string[];
+  tagIds: number[];
   privacyProfileIds: number[];
+  cloudSync: boolean;
+  lastSyncedAt: string | null;
   createdAt: string | Date;
   lastUsedAt: string | null;
 }

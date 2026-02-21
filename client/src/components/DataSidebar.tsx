@@ -87,17 +87,17 @@ export const DataSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { 
-    apiKeys, fetchApiKeys, privacyProfiles, fetchPrivacyProfiles, language, 
-    generateApiKeyString, createApiKey, createPrivacyProfile,
+    shares, fetchShares, privacyProfiles, fetchPrivacyProfiles, language, 
+    generateShareKeyString, createShare, createPrivacyProfile,
     tags, fetchTags
   } = useAppStore(useShallow(state => ({
-    apiKeys: state.apiKeys,
-    fetchApiKeys: state.fetchApiKeys,
+    shares: state.shares,
+    fetchShares: state.fetchShares,
     privacyProfiles: state.privacyProfiles,
     fetchPrivacyProfiles: state.fetchPrivacyProfiles,
     language: state.language,
-    generateApiKeyString: state.generateApiKeyString,
-    createApiKey: state.createApiKey,
+    generateShareKeyString: state.generateShareKeyString,
+    createShare: state.createShare,
     createPrivacyProfile: state.createPrivacyProfile,
     tags: state.tags,
     fetchTags: state.fetchTags
@@ -105,24 +105,24 @@ export const DataSidebar = () => {
   const t = translations[language];
 
   // Manually extract IDs from path since DataSidebar is outside the Route context
-  const keyMatch = location.pathname.match(/\/data\/key\/(\d+)/);
+  const shareMatch = location.pathname.match(/\/data\/share\/(\d+)/);
   const rulesetMatch = location.pathname.match(/\/data\/ruleset\/(\d+)/);
-  const currentKeyId = keyMatch ? keyMatch[1] : null;
+  const currentShareId = shareMatch ? shareMatch[1] : null;
   const currentRulesetId = rulesetMatch ? rulesetMatch[1] : null;
 
   useEffect(() => {
-    fetchApiKeys();
+    fetchShares();
     fetchPrivacyProfiles();
     if (tags.length === 0) fetchTags();
   }, []);
 
-  const isKeyActive = location.pathname.includes('/data/key/');
+  const isShareActive = location.pathname.includes('/data/share/');
   const isRulesetActive = location.pathname.includes('/data/ruleset/');
 
   return (
     <ScrollArea h="100%" p="xs">
       <Stack gap="md">
-        {/* API KEYS SECTION */}
+        {/* SHARES SECTION */}
         <Stack gap="xs">
           <Group justify="space-between" px="xs">
             <Group gap="xs">
@@ -136,10 +136,9 @@ export const DataSidebar = () => {
                 variant="subtle" 
                 size="sm" 
                 onClick={async () => {
-                  const key = await generateApiKeyString();
-                  await createApiKey(t.keyName + ' ' + (apiKeys.length + 1), 'all', [], key || undefined);
-                  // Navigation will be handled by list update if we want, but better to navigate to the new key
-                  fetchApiKeys();
+                  const key = await generateShareKeyString();
+                  await createShare(t.keyName + ' ' + (shares.length + 1), 'all', [], [], key || undefined);
+                  fetchShares();
                 }}
               >
                 <IconPlus size={14} />
@@ -148,13 +147,13 @@ export const DataSidebar = () => {
           </Group>
           
           <Stack gap={2}>
-            {apiKeys.map(key => (
+            {shares.map(share => (
               <NavLink
-                key={key.id}
-                label={key.name}
+                key={share.id}
+                label={share.name}
                 leftSection={<IconKey size={14} />}
-                active={isKeyActive && currentKeyId === key.id.toString()}
-                onClick={() => navigate(`/data/key/${key.id}`)}
+                active={isShareActive && currentShareId === share.id.toString()}
+                onClick={() => navigate(`/data/share/${share.id}`)}
                 variant="light"
                 styles={{ label: { fontSize: '13px' } }}
               />

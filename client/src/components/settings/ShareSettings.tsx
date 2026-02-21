@@ -7,11 +7,20 @@ import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 
-export const ApiKeySettings = () => {
+import { useState, useEffect } from 'react';
+import { Title, Card, Group, Stack, Text, Button, ActionIcon, Badge, Modal, TextInput, MultiSelect, Switch } from '@mantine/core';
+import { IconPlus, IconShare, IconShieldLock, IconSettings, IconTrash, IconCopy, IconCheck, IconFlask, IconCloudCheck, IconCloudX } from '@tabler/icons-react';
+import { useAppStore } from '../../store';
+import { translations } from '../../i18n';
+import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
+import { useNavigate } from 'react-router-dom';
+
+export const ShareSettings = () => {
   const navigate = useNavigate();
   const { 
-    apiKeys, fetchApiKeys, createApiKey, deleteApiKey, updateApiKey, 
-    generateApiKeyString, tags, privacyProfiles, language, isLoading 
+    shares, fetchShares, createShare, deleteShare, updateShare, 
+    generateShareKeyString, tags, privacyProfiles, language, isLoading 
   } = useAppStore();
   const t = translations[language];
 
@@ -20,26 +29,26 @@ export const ApiKeySettings = () => {
   const [newKeyName, setNewKeyName] = useState('');
   const [selectedTagsForKey, setSelectedTagsForKey] = useState<string[]>([]);
   const [selectedPrivacyProfiles, setSelectedPrivacyProfiles] = useState<string[]>([]);
+  const [cloudSync, setCloudSync] = useState(false);
   const [existingKeyString, setExistingKeyString] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchApiKeys();
+    fetchShares();
   }, []);
 
   const handleSave = async () => {
-      const perms = selectedTagsForKey.length > 0 
-          ? selectedTagsForKey.map(id => `tag:${id}`).join(',')
-          : 'files:read,tags:read';
+      const tagIds = selectedTagsForKey.map(id => parseInt(id));
       const profileIds = selectedPrivacyProfiles.map(id => parseInt(id));
       
       if (editingKeyId) {
-          await updateApiKey(editingKeyId, { 
+          await updateShare(editingKeyId, { 
               name: newKeyName, 
-              permissions: perms as any, 
-              privacyProfileIds: profileIds 
+              tagIds, 
+              privacyProfileIds: profileIds,
+              cloudSync
           });
       } else {
-          await createApiKey(newKeyName, perms, profileIds, existingKeyString || undefined);
+          await createShare(newKeyName, 'all', tagIds, profileIds, existingKeyString || undefined);
       }
       setIsKeyModalOpen(false);
   };
@@ -59,11 +68,12 @@ export const ApiKeySettings = () => {
                       variant="light" 
                       size="xs" 
                       onClick={async () => {
-                          const preGeneratedKey = await generateApiKeyString();
+                          const preGeneratedKey = await generateShareKeyString();
                           setEditingKeyId(null);
                           setNewKeyName(t.keyName);
                           setSelectedTagsForKey([]);
                           setSelectedPrivacyProfiles([]);
+                          setCloudSync(false);
                           setExistingKeyString(preGeneratedKey);
                           setIsKeyModalOpen(true);
                       }}
@@ -75,34 +85,41 @@ export const ApiKeySettings = () => {
           </Card.Section>
 
           <Stack gap="xs" mt="md">
-              {apiKeys.length === 0 && (
-                  <Text c="dimmed" ta="center" py="md">No API keys created yet.</Text>
+              {shares.length === 0 && (
+                  <Text c="dimmed" ta="center" py="md">No shares created yet.</Text>
               )}
               
-              {apiKeys.map(key => (
-                  <Group key={key.id} justify="space-between" p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: '4px' }}>
+              {shares.map(share => (
+                  <Group key={share.id} justify="space-between" p="sm" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: '4px' }}>
                       <Stack gap={4} style={{ flex: 1 }}>
                           <Group gap="xs">
-                              <IconKey size={20} color="gray" />
-                              <Text size="sm" fw={500}>{key.name}</Text>
+                              <IconShare size={20} color="gray" />
+                              <Text size="sm" fw={500}>{share.name}</Text>
+                              {share.cloudSync && (
+                                  <Badge size="xs" color="teal" variant="light" leftSection={<IconCloudCheck size={10} />}>
+                                      Relay Sync
+                                  </Badge>
+                              )}
                           </Group>
                           <Group gap="xs">
                               <Text size="xs" c="dimmed">
-                                  {t.lastUsed}: {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : t.never}
+                                  {t.lastUsed}: {share.lastUsedAt ? new Date(share.lastUsedAt).toLocaleString() : t.never}
                               </Text>
-                              <Text size="xs" c="dimmed" style={{ borderLeft: '1px solid gray', paddingLeft: '8px' }}>
-                                  {key.permissions.map(p => {
-                                      if (p.startsWith('tag:')) {
-                                          const id = parseInt(p.split(':')[1]);
-                                          const tag = tags.find(t => t.id === id);
-                                          return tag ? tag.name : p;
-                                      }
-                                      return p;
-                                  }).join(', ')}
-                              </Text>
-                              {key.privacyProfileIds && key.privacyProfileIds.length > 0 && (
+                              <Group gap={4}>
+                                  {share.tagIds && share.tagIds.length > 0 ? (
+                                      share.tagIds.map(tid => {
+                                          const tag = tags.find(tg => tg.id === tid);
+                                          return tag ? (
+                                              <Badge key={tid} size="xs" variant="dot" color={tag.color || 'blue'}>{tag.name}</Badge>
+                                          ) : null;
+                                      })
+                                  ) : (
+                                      <Text size="xs" c="dimmed">{t.files}</Text>
+                                  )}
+                              </Group>
+                              {share.privacyProfileIds && share.privacyProfileIds.length > 0 && (
                                   <Group gap={4}>
-                                      {key.privacyProfileIds.map(pid => {
+                                      {share.privacyProfileIds.map(pid => {
                                           const profile = privacyProfiles.find(p => p.id === pid);
                                           return profile ? (
                                               <Badge key={pid} variant="outline" size="xs" color="blue" leftSection={<IconShieldLock size={10} />}>
@@ -119,7 +136,7 @@ export const ApiKeySettings = () => {
                               variant="light" 
                               color="green"
                               title="Test Context Export"
-                              onClick={() => navigate(`/export/${key.id}`)}
+                              onClick={() => navigate(`/export/${share.id}`)}
                           >
                               <IconFlask size={16} />
                           </ActionIcon>
@@ -127,11 +144,12 @@ export const ApiKeySettings = () => {
                               variant="light" 
                               color="blue"
                               onClick={async () => {
-                                  const preGeneratedKey = await generateApiKeyString();
+                                  const preGeneratedKey = await generateShareKeyString();
                                   setEditingKeyId(null);
-                                  setNewKeyName(`${key.name} (Copy)`);
-                                  setSelectedTagsForKey(key.permissions.filter(p => p.startsWith('tag:')).map(p => p.split(':')[1]));
-                                  setSelectedPrivacyProfiles(key.privacyProfileIds ? key.privacyProfileIds.map(String) : []);
+                                  setNewKeyName(`${share.name} (Copy)`);
+                                  setSelectedTagsForKey(share.tagIds ? share.tagIds.map(String) : []);
+                                  setSelectedPrivacyProfiles(share.privacyProfileIds ? share.privacyProfileIds.map(String) : []);
+                                  setCloudSync(share.cloudSync);
                                   setExistingKeyString(preGeneratedKey);
                                   setIsKeyModalOpen(true);
                               }}
@@ -141,11 +159,12 @@ export const ApiKeySettings = () => {
                           <ActionIcon 
                               variant="light" 
                               onClick={() => {
-                                  setEditingKeyId(key.id);
-                                  setNewKeyName(key.name);
-                                  setSelectedTagsForKey(key.permissions.filter(p => p.startsWith('tag:')).map(p => p.split(':')[1]));
-                                  setSelectedPrivacyProfiles(key.privacyProfileIds ? key.privacyProfileIds.map(String) : []);
-                                  setExistingKeyString(key.key || null);
+                                  setEditingKeyId(share.id);
+                                  setNewKeyName(share.name);
+                                  setSelectedTagsForKey(share.tagIds ? share.tagIds.map(String) : []);
+                                  setSelectedPrivacyProfiles(share.privacyProfileIds ? share.privacyProfileIds.map(String) : []);
+                                  setCloudSync(share.cloudSync);
+                                  setExistingKeyString(share.key || null);
                                   setIsKeyModalOpen(true);
                               }}
                           >
@@ -160,7 +179,7 @@ export const ApiKeySettings = () => {
                                       children: <Text size="sm">{t.areYouSure}</Text>,
                                       labels: { confirm: t.delete, cancel: t.cancel },
                                       confirmProps: { color: 'red' },
-                                      onConfirm: () => deleteApiKey(key.id),
+                                      onConfirm: () => deleteShare(share.id),
                                   });
                               }}
                           >
@@ -181,7 +200,7 @@ export const ApiKeySettings = () => {
               {existingKeyString && (
                   <Group gap="xs">
                       <TextInput 
-                          label="API Key"
+                          label="Share Link Key"
                           value={existingKeyString} 
                           readOnly 
                           style={{ flex: 1 }}
@@ -207,14 +226,14 @@ export const ApiKeySettings = () => {
               )}
               <TextInput 
                   label={t.keyName} 
-                  placeholder="e.g. Home Automation"
+                  placeholder="e.g. Mathe 10b"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.currentTarget.value)}
                   autoFocus
               />
               <MultiSelect 
                   label={t.tags}
-                  placeholder="Select tags this key can access"
+                  placeholder="Select tags to share"
                   data={tags.map(t => ({ value: String(t.id), label: t.name }))}
                   value={selectedTagsForKey}
                   onChange={setSelectedTagsForKey}
@@ -225,6 +244,12 @@ export const ApiKeySettings = () => {
                   data={privacyProfiles.map(p => ({ value: String(p.id), label: p.name }))}
                   value={selectedPrivacyProfiles}
                   onChange={setSelectedPrivacyProfiles}
+              />
+              <Switch 
+                  label={t.cloudSync}
+                  checked={cloudSync}
+                  onChange={(e) => setCloudSync(e.currentTarget.checked)}
+                  thumbIcon={cloudSync ? <IconCloudCheck size={12} /> : <IconCloudX size={12} />}
               />
               <Button 
                   onClick={handleSave}

@@ -9,14 +9,15 @@ export const PublicController = {
     async getFiles(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
-            const apiKey = (req as AuthRequest).apiKey;
+            const share = (req as AuthRequest).share;
             
             let allowedTagIds: number[] | undefined = undefined;
-            if (apiKey) {
-                allowedTagIds = apiKey.permissions
-                    .filter(p => p.startsWith('tag:'))
-                    .map(p => parseInt(p.split(':')[1]))
-                    .filter(id => !isNaN(id));
+            if (share) {
+                if (share.permissions.includes('all')) {
+                    allowedTagIds = undefined;
+                } else {
+                    allowedTagIds = share.tagIds || [];
+                }
             }
 
             const files = await fileRepository.getAll(userId, allowedTagIds);
@@ -29,7 +30,7 @@ export const PublicController = {
     async getAllFilesText(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
-            const apiKey = (req as AuthRequest).apiKey;
+            const share = (req as AuthRequest).share;
             const { tag, q, limit, format } = req.query as { tag?: string, q?: string, limit?: string, format?: string };
             const asHtml = format === 'html';
             
@@ -37,11 +38,12 @@ export const PublicController = {
             const maxResponseSize = 10 * 1024 * 1024; // 10MB limit
 
             let allowedTagIds: number[] | undefined = undefined;
-            if (apiKey) {
-                allowedTagIds = apiKey.permissions
-                    .filter(p => p.startsWith('tag:'))
-                    .map(p => parseInt(p.split(':')[1]))
-                    .filter(id => !isNaN(id));
+            if (share) {
+                if (share.permissions.includes('all')) {
+                    allowedTagIds = undefined;
+                } else {
+                    allowedTagIds = share.tagIds || [];
+                }
             }
 
             // Allow UI overrides for preview if the owner is authenticated
@@ -49,7 +51,7 @@ export const PublicController = {
             if (overrideTags !== undefined && (req as AuthRequest).user) {
                 allowedTagIds = overrideTags ? overrideTags.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
             }
-            let activeProfileIds = apiKey?.privacyProfileIds || [];
+            let activeProfileIds = share?.privacyProfileIds || [];
             if (overrideProfiles !== undefined && (req as AuthRequest).user) {
                 activeProfileIds = overrideProfiles ? overrideProfiles.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
             }
@@ -111,7 +113,7 @@ export const PublicController = {
     async getAllFilesJson(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
-            const apiKey = (req as AuthRequest).apiKey;
+            const share = (req as AuthRequest).share;
             const { tag, q, limit, format } = req.query as { tag?: string, q?: string, limit?: string, format?: string };
             const asHtml = format === 'html';
             
@@ -119,11 +121,12 @@ export const PublicController = {
             const maxContentSize = 5 * 1024 * 1024; // 5MB per batch for JSON
 
             let allowedTagIds: number[] | undefined = undefined;
-            if (apiKey) {
-                allowedTagIds = apiKey.permissions
-                    .filter(p => p.startsWith('tag:'))
-                    .map(p => parseInt(p.split(':')[1]))
-                    .filter(id => !isNaN(id));
+            if (share) {
+                if (share.permissions.includes('all')) {
+                    allowedTagIds = undefined;
+                } else {
+                    allowedTagIds = share.tagIds || [];
+                }
             }
 
             // Allow UI overrides for preview
@@ -131,7 +134,7 @@ export const PublicController = {
             if (overrideTags !== undefined && (req as AuthRequest).user) {
                 allowedTagIds = overrideTags ? overrideTags.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
             }
-            let activeProfileIds = apiKey?.privacyProfileIds || [];
+            let activeProfileIds = share?.privacyProfileIds || [];
             if (overrideProfiles !== undefined && (req as AuthRequest).user) {
                 activeProfileIds = overrideProfiles ? overrideProfiles.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
             }
@@ -206,15 +209,15 @@ export const PublicController = {
     async search(req: Request, res: Response) {
         try {
             const userId = (req as AuthRequest).user!.id;
-            const apiKey = (req as AuthRequest).apiKey;
+            const share = (req as AuthRequest).share;
             const { filename, content, directory } = req.query as { filename?: string, content?: string, directory?: string };
             
             let results = await searchRepository.search(userId, { filename, content, directory });
             
-            if (apiKey && apiKey.privacyProfileIds && apiKey.privacyProfileIds.length > 0) {
+            if (share && share.privacyProfileIds && share.privacyProfileIds.length > 0) {
                 results = await Promise.all(results.map(async (f: any) => {
                     if (f.snippet) {
-                        f.snippet = await privacyService.redactWithMultipleProfiles(f.snippet, apiKey.privacyProfileIds);
+                        f.snippet = await privacyService.redactWithMultipleProfiles(f.snippet, share.privacyProfileIds);
                     }
                     return f;
                 }));
@@ -230,17 +233,18 @@ export const PublicController = {
         try {
             const userId = (req as AuthRequest).user!.id;
             const { id } = req.params;
-            const apiKey = (req as AuthRequest).apiKey;
+            const share = (req as AuthRequest).share;
             const { profileId, format } = req.query;
             const asHtml = format === 'html';
             const asJson = format === 'json';
             
             let allowedTagIds: number[] | undefined = undefined;
-            if (apiKey) {
-                allowedTagIds = apiKey.permissions
-                    .filter(p => p.startsWith('tag:'))
-                    .map(p => parseInt(p.split(':')[1]))
-                    .filter(id => !isNaN(id));
+            if (share) {
+                if (share.permissions.includes('all')) {
+                    allowedTagIds = undefined;
+                } else {
+                    allowedTagIds = share.tagIds || [];
+                }
             }
 
             const sql = `SELECT f.path, f.name, f.extension, f.mimeType, f.size FROM FileHandle f JOIN Scope s ON f.scopeId = s.id WHERE f.id = ? AND s.userId = ?`;
@@ -248,17 +252,17 @@ export const PublicController = {
             
             if (!file) return res.status(404).json({ error: 'File not found' });
 
-            if (allowedTagIds && allowedTagIds.length > 0) {
-                const tagCheck = db.prepare('SELECT 1 FROM _FileHandleToTag WHERE A = ? AND B IN (' + allowedTagIds.map(() => '?').join(',') + ')').get(id, ...allowedTagIds);
+            if (allowedTagIds !== undefined) {
+                const tagCheck = db.prepare('SELECT 1 FROM _FileHandleToTag WHERE A = ? AND B IN (' + (allowedTagIds.length > 0 ? allowedTagIds.map(() => '?').join(',') : 'NULL') + ')').get(id, ...allowedTagIds);
                 if (!tagCheck) return res.status(403).json({ error: 'Access denied' });
             }
 
             let text = await fileService.extractText(file.path, file.extension);
 
-            // Use profiles from API Key or manual override (for preview)
+            // Use profiles from Share or manual override (for preview)
             let profileIdsToApply: number[] = [];
-            if (apiKey && apiKey.privacyProfileIds && apiKey.privacyProfileIds.length > 0) {
-                profileIdsToApply = apiKey.privacyProfileIds;
+            if (share && share.privacyProfileIds && share.privacyProfileIds.length > 0) {
+                profileIdsToApply = share.privacyProfileIds;
             } else if (profileId) {
                 profileIdsToApply = Array.isArray(profileId) 
                     ? profileId.map(pid => Number(pid)) 

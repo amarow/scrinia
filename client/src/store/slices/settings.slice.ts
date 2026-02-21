@@ -1,11 +1,11 @@
 import type { StateCreator } from 'zustand';
-import type { ApiKey, PrivacyProfile, PrivacyRule } from '../types';
+import type { Share, PrivacyProfile, PrivacyRule } from '../types';
 import { API_BASE, authFetch } from '../utils';
 import { notifications } from '@mantine/notifications';
 import { translations } from '../../i18n';
 
 export interface SettingsSlice {
-  apiKeys: ApiKey[];
+  shares: Share[];
   privacyProfiles: PrivacyProfile[];
   editingRule: { 
     ruleId?: number, 
@@ -17,11 +17,11 @@ export interface SettingsSlice {
   isPrivacyModalOpen: boolean;
   privacyRefreshCounter: number;
   
-  fetchApiKeys: () => Promise<void>;
-  generateApiKeyString: () => Promise<string | null>;
-  createApiKey: (name: string, permissions?: string, privacyProfileIds?: number[], key?: string) => Promise<ApiKey | null>;
-  updateApiKey: (id: number, updates: Partial<Pick<ApiKey, 'name' | 'permissions' | 'privacyProfileIds'>>) => Promise<void>;
-  deleteApiKey: (id: number) => Promise<void>;
+  fetchShares: () => Promise<void>;
+  generateShareKeyString: () => Promise<string | null>;
+  createShare: (name: string, permissions?: string, tagIds?: number[], privacyProfileIds?: number[], key?: string) => Promise<Share | null>;
+  updateShare: (id: number, updates: Partial<Pick<Share, 'name' | 'permissions' | 'tagIds' | 'privacyProfileIds' | 'cloudSync'>>) => Promise<void>;
+  deleteShare: (id: number) => Promise<void>;
 
   fetchPrivacyProfiles: () => Promise<void>;
   createPrivacyProfile: (name: string, rules?: Omit<PrivacyRule, 'id' | 'profileId'>[]) => Promise<PrivacyProfile | null>;
@@ -39,90 +39,90 @@ export interface SettingsSlice {
 }
 
 export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (set, get) => ({
-  apiKeys: [],
+  shares: [],
   privacyProfiles: [],
   editingRule: null,
   isPrivacyModalOpen: false,
   privacyRefreshCounter: 0,
 
-  fetchApiKeys: async () => {
+  fetchShares: async () => {
     try {
-      const res = await authFetch(`${API_BASE}/api/keys`, get().token);
+      const res = await authFetch(`${API_BASE}/api/shares`, get().token);
       if (res.ok) {
         const data = await res.json();
-        set({ apiKeys: data });
+        set({ shares: data });
       }
     } catch (e) {
-      console.error("Failed to fetch api keys", e);
+      console.error("Failed to fetch shares", e);
     }
   },
 
-  generateApiKeyString: async () => {
+  generateShareKeyString: async () => {
     try {
-      const res = await authFetch(`${API_BASE}/api/keys/generate`, get().token);
+      const res = await authFetch(`${API_BASE}/api/shares/generate`, get().token);
       if (res.ok) {
         const data = await res.json();
         return data.key;
       }
     } catch (e) {
-      console.error("Failed to generate api key string", e);
+      console.error("Failed to generate share key string", e);
     }
     return null;
   },
 
-  createApiKey: async (name, permissions, privacyProfileIds, key) => {
+  createShare: async (name, permissions, tagIds, privacyProfileIds, key) => {
     set({ isLoading: true });
     try {
       const perms = Array.isArray(permissions) ? permissions.join(',') : permissions;
-      const res = await authFetch(`${API_BASE}/api/keys`, get().token, {
+      const res = await authFetch(`${API_BASE}/api/shares`, get().token, {
         method: 'POST',
-        body: JSON.stringify({ name, permissions: perms, privacyProfileIds, key })
+        body: JSON.stringify({ name, permissions: perms, tagIds, privacyProfileIds, key })
       });
       if (res.ok) {
-        const newKey = await res.json();
-        await get().fetchApiKeys();
+        const newShare = await res.json();
+        await get().fetchShares();
         set({ isLoading: false });
-        return newKey;
+        return newShare;
       }
       set({ isLoading: false });
       return null;
     } catch (e) {
       set({ isLoading: false });
-      console.error("Failed to create api key", e);
+      console.error("Failed to create share", e);
       return null;
     }
   },
 
-  deleteApiKey: async (id) => {
+  deleteShare: async (id) => {
     try {
-      const res = await authFetch(`${API_BASE}/api/keys/${id}`, get().token, { method: 'DELETE' });
+      const res = await authFetch(`${API_BASE}/api/shares/${id}`, get().token, { method: 'DELETE' });
       if (res.ok) {
-        await get().fetchApiKeys();
+        await get().fetchShares();
         const lang = get().language as 'en' | 'de';
         notifications.show({
             title: translations[lang].delete,
-            message: 'API Key deleted',
+            message: 'Share deleted',
             color: 'blue'
         });
       }
     } catch (e) {
-      console.error("Failed to delete api key", e);
+      console.error("Failed to delete share", e);
     }
   },
 
-  updateApiKey: async (id, updates) => {
+  updateShare: async (id, updates) => {
     try {
       const payload: any = { ...updates };
       if (updates.permissions && Array.isArray(updates.permissions)) {
         payload.permissions = updates.permissions.join(',');
       }
-      const res = await authFetch(`${API_BASE}/api/keys/${id}`, get().token, {
+      const res = await authFetch(`${API_BASE}/api/shares/${id}`, get().token, {
         method: 'PATCH',
         body: JSON.stringify(payload)
       });
-      if (res.ok) await get().fetchApiKeys();
+      if (res.ok) await get().fetchShares();
     } catch (e) {
-      console.error("Failed to update api key", e);
+      console.error("Failed to update share", e);
     }
   },
 
@@ -163,7 +163,7 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
       });
       if (res.ok) {
         await get().fetchPrivacyProfiles();
-        await get().fetchApiKeys(); 
+        await get().fetchShares(); 
       }
     } catch (e) {
       console.error("Failed to update privacy profile", e);
@@ -175,7 +175,7 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
       const res = await authFetch(`${API_BASE}/api/privacy/profiles/${id}`, get().token, { method: 'DELETE' });
       if (res.ok) {
         await get().fetchPrivacyProfiles();
-        await get().fetchApiKeys();
+        await get().fetchShares();
         const lang = get().language as 'en' | 'de';
         notifications.show({
             title: translations[lang].delete,
@@ -306,7 +306,7 @@ export const createSettingsSlice: StateCreator<any, [], [], SettingsSlice> = (se
         get().fetchFiles(),
         get().fetchScopes(),
         get().fetchTags(),
-        get().fetchApiKeys(),
+        get().fetchShares(),
         get().fetchPrivacyProfiles()
     ]);
   },

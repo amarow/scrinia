@@ -1,15 +1,33 @@
 import * as fs from 'fs/promises';
+import * as fsNative from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import AdmZip from 'adm-zip';
 import heicConvert from 'heic-convert';
 import mammoth from 'mammoth';
 const pdf = require('pdf-parse');
 
 export const fileService = {
+    calculateHash(filePath: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const hash = crypto.createHash('sha256');
+            const stream = fsNative.createReadStream(filePath);
+            stream.on('data', (data) => hash.update(data));
+            stream.on('end', () => resolve(hash.digest('hex')));
+            stream.on('error', (err) => reject(err));
+        });
+    },
+
     async extractText(filePath: string, extension: string): Promise<string> {
         const ext = extension.toLowerCase();
         
         try {
+            // Check size first (limit to 20MB for text extraction)
+            const stats = await fs.stat(filePath);
+            const maxSize = (ext === '.pdf' || ext === '.docx' || ext === '.odt') ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+            
+            if (stats.size > maxSize) return "";
+
             if (ext === '.pdf') {
                 const dataBuffer = await fs.readFile(filePath);
 
@@ -57,8 +75,12 @@ export const fileService = {
                 return "";
             }
 
-            // Default: Read as plain text
-            return await fs.readFile(filePath, 'utf8');
+            // Default: Read as plain text for known text extensions
+            const textExtensions = ['.txt', '.md', '.markdown', '.json', '.ts', '.js', '.jsx', '.tsx', '.html', '.css', '.scss', '.xml', '.yaml', '.yml', '.sql', '.env'];
+            if (textExtensions.includes(ext)) {
+                 return await fs.readFile(filePath, 'utf8');
+            }
+            return "";
         } catch (e) {
             console.error(`Error extracting text from ${filePath}:`, e);
             return "";

@@ -7,7 +7,7 @@ import { authenticateToken } from './auth';
 // Route Imports
 import authRoutes from './routes/auth.routes';
 import fsRoutes from './routes/fs.routes';
-import apiKeyRoutes from './routes/apiKey.routes';
+import shareRoutes from './routes/share.routes';
 import privacyRoutes from './routes/privacy.routes';
 import scopeRoutes from './routes/scope.routes';
 import fileRoutes from './routes/file.routes';
@@ -34,7 +34,7 @@ app.get('/', (req, res) => {
 // --- Register Modular Routes ---
 app.use('/api', authRoutes);
 app.use('/api/fs', fsRoutes);
-app.use('/api/keys', apiKeyRoutes);
+app.use('/api/shares', shareRoutes);
 app.use('/api/privacy', privacyRoutes);
 app.use('/api/scopes', scopeRoutes);
 app.use('/api/files', fileRoutes);

@@ -94,7 +94,7 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
     const { 
         previewFileId, setPreviewFileId, files, searchResults, 
         token, openFile, openDirectory, language,
-        privacyProfiles, fetchPrivacyProfiles, apiKeys, fetchApiKeys,
+        privacyProfiles, fetchPrivacyProfiles, shares, fetchShares,
         setEditingRule, fetchPrivacyRules, setIsPrivacyModalOpen,
         privacyRefreshCounter, activeMainTab
     } = useAppStore(useShallow(state => ({
@@ -108,8 +108,8 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
         language: state.language,
         privacyProfiles: state.privacyProfiles,
         fetchPrivacyProfiles: state.fetchPrivacyProfiles,
-        apiKeys: state.apiKeys,
-        fetchApiKeys: state.fetchApiKeys,
+        shares: state.shares,
+        fetchShares: state.fetchShares,
         setEditingRule: state.setEditingRule,
         fetchPrivacyRules: state.fetchPrivacyRules,
         setIsPrivacyModalOpen: state.setIsPrivacyModalOpen,
@@ -125,7 +125,7 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
 
     const [redactedText, setRedactedText] = useState<string | null>(null);
     const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-    const [selectedApiKeyId, setSelectedApiKeyId] = useState<string | null>(null);
+    const [selectedShareId, setSelectedShareId] = useState<string | null>(null);
     const [hasSelection, setHasSelection] = useState(false);
     const [selectionText, setSelectionText] = useState('');
     const [responseFormat, setResponseFormat] = useState<'text' | 'json'>('text');
@@ -136,7 +136,7 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
     // Generate dynamic URL for single file
     const getDynamicUrl = () => {
         if (!file) return '';
-        const key = apiKeys.find(k => k.id.toString() === selectedApiKeyId)?.key || 'YOUR_KEY';
+        const key = shares.find(k => k.id.toString() === selectedShareId)?.key || 'YOUR_KEY';
         return `${API_BASE}/api/v1/files/${file.id}/text?apiKey=${key}${responseFormat === 'json' ? '&format=json' : ''}`;
     };
 
@@ -145,10 +145,10 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
         if (privacyProfiles.length > 0 && !selectedProfileId) {
             setSelectedProfileId(privacyProfiles[0].id.toString());
         }
-        if (apiKeys.length > 0 && !selectedApiKeyId) {
-            setSelectedApiKeyId(apiKeys[0].id.toString());
+        if (shares.length > 0 && !selectedShareId) {
+            setSelectedShareId(shares[0].id.toString());
         }
-    }, [privacyProfiles, apiKeys]);
+    }, [privacyProfiles, shares]);
 
     const handleAddRuleFromSelection = async () => {
         const currentSelection = (window as any)._currentScriniaSelection;
@@ -194,10 +194,10 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
 
         if (viewMode === 'editor' && selectedProfileId) {
             url += `&profileId=${selectedProfileId}`;
-        } else if (viewMode === 'preview' && selectedApiKeyId) {
-            const apiKey = apiKeys.find(k => k.id.toString() === selectedApiKeyId);
-            if (apiKey && apiKey.privacyProfileIds?.length > 0) {
-                url += `&${apiKey.privacyProfileIds.map(id => `profileId=${id}`).join('&')}`;
+        } else if (viewMode === 'preview' && selectedShareId) {
+            const share = shares.find(k => k.id.toString() === selectedShareId);
+            if (share && share.privacyProfileIds?.length > 0) {
+                url += `&${share.privacyProfileIds.map(id => `profileId=${id}`).join('&')}`;
             }
         }
 
@@ -214,7 +214,7 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
                 setError(err.message);
                 setLoading(false);
             });
-    }, [viewMode, file, token, selectedProfileId, selectedApiKeyId, apiKeys]);
+    }, [viewMode, file, token, selectedProfileId, selectedShareId, shares]);
 
     const handleRedactedClick = useCallback((ruleId: number, profileId: number) => {
         setEditingRule({ ruleId, profileId });
@@ -233,14 +233,14 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
     useEffect(() => {
         if (token) {
             if (privacyProfiles.length === 0) fetchPrivacyProfiles();
-            if (apiKeys.length === 0) fetchApiKeys();
+            if (shares.length === 0) fetchShares();
         }
     }, [token]);
 
-    // Fetch redacted text when viewMode, profile, API Key or refresh counter changes
+    // Fetch redacted text when viewMode, profile, Share or refresh counter changes
     useEffect(() => {
         fetchRedactedText();
-    }, [fetchRedactedText, privacyRefreshCounter, selectedProfileId, selectedApiKeyId, viewMode]);
+    }, [fetchRedactedText, privacyRefreshCounter, selectedProfileId, selectedShareId, viewMode]);
 
     // Handle Escape key to close preview
     useEffect(() => {
@@ -479,12 +479,12 @@ export const FilePreviewPanel = React.memo(function FilePreviewPanel() {
                                             ) : (
                                                 <Group gap="xs" align="flex-end" wrap="nowrap" style={{ flex: 1 }}>
                                                     <Select
-                                                        label="API Key"
+                                                        label="Share"
                                                         size="xs"
                                                         placeholder={t.apiKey}
-                                                        data={apiKeys.map(k => ({ value: k.id.toString(), label: k.name }))}
-                                                        value={selectedApiKeyId}
-                                                        onChange={setSelectedApiKeyId}
+                                                        data={shares.map(k => ({ value: k.id.toString(), label: k.name }))}
+                                                        value={selectedShareId}
+                                                        onChange={setSelectedShareId}
                                                         style={{ width: 180, flexShrink: 0 }}
                                                     />
                                                     <Select

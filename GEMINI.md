@@ -11,9 +11,10 @@
 
 ### Backend (Node.js/Express) - IMPLEMENTIERT
 - **Technologie:** TypeScript, Express 5.
-- **Crawler:** Scannt Scopes, erkennt Dateiänderungen (Größe, Datum) und verwaltet FileHandles in der DB.
-- **Datenbank:** SQLite via `better-sqlite3`. Schema umfasst `FileHandle`, `Tag`, `Scope`, `User`, `PrivacyProfile`, `ApiKey`.
-- **Authentifizierung:** JWT-basiert für die UI, API-Keys für externe Tools.
+- **Crawler:** Scannt Scopes, erkennt Dateiänderungen (Größe, Datum, SHA-256 Hash) und verwaltet FileHandles in der DB.
+- **Datenbank:** SQLite via `better-sqlite3`. Schema umfasst `FileHandle`, `Tag`, `Scope`, `User`, `PrivacyProfile`, `Share`.
+- **Authentifizierung:** JWT-basiert für die UI, Share-Tokens für externe Tools.
+- **Relay-Vorbereitung:** Content-Addressable Storage (CAS) via SHA-256 Hashes für Deduplizierung.
 - **Features:** 
     - Full-Text-Search (FTS5) Vorbereitung.
     - Dokumenten-Extraktion (.docx via mammoth, .odt via zip/xml, .heic Konvertierung via sharp/heic-convert).

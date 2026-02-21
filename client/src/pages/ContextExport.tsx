@@ -8,9 +8,9 @@ import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 
 export function ContextExportPage() {
-    const { keyId } = useParams();
+    const { shareId } = useParams();
     const navigate = useNavigate();
-    const { tags, language, token, apiKeys, fetchApiKeys, fetchTags } = useAppStore();
+    const { tags, language, token, shares, fetchShares, fetchTags } = useAppStore();
     const t = translations[language];
 
     const [batchTag, setBatchTag] = useState<string | null>(null);
@@ -21,34 +21,34 @@ export function ContextExportPage() {
     const [previewCount, setPreviewCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // Find the specific API Key
-    const apiKey = apiKeys.find(k => k.id.toString() === keyId);
+    // Find the specific Share
+    const share = shares.find(k => k.id.toString() === shareId);
 
     useEffect(() => {
         if (token) {
-            if (apiKeys.length === 0) fetchApiKeys();
+            if (shares.length === 0) fetchShares();
             if (tags.length === 0) fetchTags();
         }
     }, [token]);
 
     // Trigger preview automatically when format changes
     useEffect(() => {
-        if (apiKey && responseFormat) {
+        if (share && responseFormat) {
             handleFetchPreview();
         }
-    }, [responseFormat, apiKey]);
+    }, [responseFormat, share]);
 
     const getDynamicUrl = () => {
-        if (!apiKey) return '';
+        if (!share) return '';
         let endpoint = responseFormat === 'json' ? 'json' : 'text';
-        let url = `${API_BASE}/api/v1/files/${endpoint}?apiKey=${apiKey.key}&limit=${batchLimit}`;
+        let url = `${API_BASE}/api/v1/files/${endpoint}?apiKey=${share.key}&limit=${batchLimit}`;
         if (batchTag) url += `&tag=${encodeURIComponent(batchTag)}`;
         if (batchQuery) url += `&q=${encodeURIComponent(batchQuery)}`;
         return url;
     };
 
     const handleFetchPreview = async () => {
-        if (!apiKey) return;
+        if (!share) return;
         setLoading(true);
         setPreviewCount(null);
         try {
@@ -78,23 +78,21 @@ export function ContextExportPage() {
     };
 
     const getAvailableTags = () => {
-        if (!apiKey) return [];
-        if (apiKey.permissions.includes('all')) {
+        if (!share) return [];
+        if (share.permissions.includes('all')) {
             return tags.map(t => ({ value: t.name, label: t.name }));
         }
-        const allowedTagIds = apiKey.permissions
-            .filter(p => p.startsWith('tag:'))
-            .map(p => parseInt(p.split(':')[1]));
+        const allowedTagIds = share.tagIds || [];
 
         return tags
             .filter(t => allowedTagIds.includes(t.id))
             .map(t => ({ value: t.name, label: t.name }));
     };
 
-    if (!apiKey && !loading) {
+    if (!share && !loading) {
         return (
             <Container size="md" py="xl">
-                <Text>API Key not found.</Text>
+                <Text>Share not found.</Text>
                 <Button onClick={() => navigate('/settings')}>Back to Settings</Button>
             </Container>
         );
@@ -125,7 +123,7 @@ export function ContextExportPage() {
                         {t.back}
                     </Button>
                     <div style={{ borderLeft: '1px solid var(--mantine-color-default-border)', paddingLeft: '1rem' }}>
-                        <Title order={3}>Full Context Export: {apiKey?.name}</Title>
+                        <Title order={3}>Full Context Export: {share?.name}</Title>
                         <Text size="xs" c="dimmed">Configure and test batch data retrieval for AI agents</Text>
                     </div>
                 </Group>

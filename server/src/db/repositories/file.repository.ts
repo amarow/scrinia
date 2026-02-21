@@ -2,7 +2,7 @@ import { db } from '../client';
 import path from 'path';
 
 export const fileRepository = {
-  async upsertFile(scopeId: number, filePath: string, stats: { size: number; ctime: Date; mtime: Date }) {
+  async upsertFile(scopeId: number, filePath: string, stats: { size: number; ctime: Date; mtime: Date }, hash?: string) {
     const runTransaction = db.transaction(() => {
       const filename = path.basename(filePath);
       const extension = path.extname(filePath).toLowerCase();
@@ -19,10 +19,11 @@ export const fileRepository = {
 
       // Using UPSERT syntax (INSERT OR REPLACE / ON CONFLICT)
       const sql = `
-        INSERT INTO FileHandle (scopeId, path, name, extension, size, mimeType, updatedAt)
-        VALUES (@scopeId, @path, @name, @extension, @size, @mimeType, @mtime)
+        INSERT INTO FileHandle (scopeId, path, name, extension, size, mimeType, hash, updatedAt)
+        VALUES (@scopeId, @path, @name, @extension, @size, @mimeType, @hash, @mtime)
         ON CONFLICT(scopeId, path) DO UPDATE SET
           size = excluded.size,
+          hash = COALESCE(excluded.hash, FileHandle.hash),
           updatedAt = excluded.updatedAt
         RETURNING id
       `;
@@ -35,6 +36,7 @@ export const fileRepository = {
           extension,
           size: stats.size,
           mimeType,
+          hash: hash || null,
           mtime: stats.mtime.toISOString()
       }) as { id: number };
 
@@ -70,15 +72,20 @@ export const fileRepository = {
       const stmt = db.prepare('DELETE FROM FileHandle WHERE scopeId = ? AND path = ?');
       stmt.run(scopeId, filePath);
   },
+
+  async updateHash(fileId: number, hash: string) {
+      const stmt = db.prepare('UPDATE FileHandle SET hash = ? WHERE id = ?');
+      stmt.run(hash, fileId);
+  },
   
   getFileMinimal(scopeId: number, filePath: string) {
       const stmt = db.prepare(`
-        SELECT f.id, f.updatedAt, f.size, 
+        SELECT f.id, f.updatedAt, f.size, f.hash, 
                EXISTS(SELECT 1 FROM FileContentIndex WHERE rowid = f.id) as hasContent
         FROM FileHandle f 
         WHERE f.scopeId = ? AND f.path = ?
       `);
-      return stmt.get(scopeId, filePath) as { id: number, updatedAt: string, size: number, hasContent: number } | undefined;
+      return stmt.get(scopeId, filePath) as { id: number, updatedAt: string, size: number, hash: string | null, hasContent: number } | undefined;
   },
   
   // Get all files for a specific user (through user's scopes)
@@ -87,10 +94,14 @@ export const fileRepository = {
       let tagFilter = '';
       const params: any[] = [userId];
 
-      if (allowedTagIds && allowedTagIds.length > 0) {
-          const placeholders = allowedTagIds.map(() => '?').join(',');
-          tagFilter = `AND f.id IN (SELECT A FROM _FileHandleToTag WHERE B IN (${placeholders}))`;
-          params.push(...allowedTagIds);
+      if (allowedTagIds !== undefined) {
+          if (allowedTagIds.length > 0) {
+              const placeholders = allowedTagIds.map(() => '?').join(',');
+              tagFilter = `AND f.id IN (SELECT A FROM _FileHandleToTag WHERE B IN (${placeholders}))`;
+              params.push(...allowedTagIds);
+          } else {
+              tagFilter = `AND 1=0`; // No tags allowed -> No files returned
+          }
       }
 
       const sql = `

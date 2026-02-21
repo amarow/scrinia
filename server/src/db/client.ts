@@ -81,11 +81,13 @@ if (isMainThread) {
         FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
       );
 
-      CREATE TABLE IF NOT EXISTS ApiKey (
+      CREATE TABLE IF NOT EXISTS Share (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         key TEXT UNIQUE NOT NULL,
         name TEXT NOT NULL,
         permissions TEXT NOT NULL,
+        cloudSync BOOLEAN NOT NULL DEFAULT 0,
+        lastSyncedAt DATETIME,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         lastUsedAt DATETIME,
         userId INTEGER NOT NULL,
@@ -111,13 +113,21 @@ if (isMainThread) {
         FOREIGN KEY (profileId) REFERENCES PrivacyProfile(id) ON DELETE CASCADE
       );
 
-      CREATE TABLE IF NOT EXISTS ApiKeyPrivacyProfile (
-        apiKeyId INTEGER NOT NULL,
+      CREATE TABLE IF NOT EXISTS SharePrivacyProfile (
+        shareId INTEGER NOT NULL,
         privacyProfileId INTEGER NOT NULL,
         sequence INTEGER NOT NULL,
-        FOREIGN KEY (apiKeyId) REFERENCES ApiKey(id) ON DELETE CASCADE,
+        FOREIGN KEY (shareId) REFERENCES Share(id) ON DELETE CASCADE,
         FOREIGN KEY (privacyProfileId) REFERENCES PrivacyProfile(id) ON DELETE CASCADE,
-        PRIMARY KEY (apiKeyId, privacyProfileId)
+        PRIMARY KEY (shareId, privacyProfileId)
+      );
+
+      CREATE TABLE IF NOT EXISTS _ShareToTag (
+        A INTEGER NOT NULL, -- Share ID
+        B INTEGER NOT NULL, -- Tag ID
+        FOREIGN KEY (A) REFERENCES Share(id) ON DELETE CASCADE,
+        FOREIGN KEY (B) REFERENCES Tag(id) ON DELETE CASCADE,
+        UNIQUE(A, B)
       );
 
       CREATE VIRTUAL TABLE IF NOT EXISTS FileContentIndex USING fts5(
@@ -132,6 +142,13 @@ if (isMainThread) {
     db.exec(schema);
     console.log(`Database initialized at ${dbPath}`);
 
+    // Migration: Add hash to FileHandle
+    const fileColumns = db.pragma('table_info(FileHandle)') as any[];
+    if (!fileColumns.some(col => col.name === 'hash')) {
+        db.prepare("ALTER TABLE FileHandle ADD COLUMN hash TEXT").run();
+        console.log("Migration: Added 'hash' column to FileHandle table");
+    }
+
     // Migration: Add isEditable column if not exists
     const tagColumns = db.pragma('table_info(Tag)') as any[];
     const hasIsEditable = tagColumns.some(col => col.name === 'isEditable');
@@ -140,12 +157,38 @@ if (isMainThread) {
         console.log("Migration: Added 'isEditable' column to Tag table");
     }
 
-    // Migration: Add privacyProfileId to ApiKey if not exists
-    const apiKeyColumns = db.pragma('table_info(ApiKey)') as any[];
-    const hasPrivacyProfileId = apiKeyColumns.some(col => col.name === 'privacyProfileId');
-    if (!hasPrivacyProfileId) {
-        db.prepare("ALTER TABLE ApiKey ADD COLUMN privacyProfileId INTEGER").run();
-        console.log("Migration: Added 'privacyProfileId' column to ApiKey table");
+    // Migration: Migrate ApiKey to Share
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {name: string}[];
+    const hasApiKey = tables.some(t => t.name === 'ApiKey');
+    if (hasApiKey) {
+        console.log("Migration: Found old ApiKey table, migrating to Share...");
+        db.transaction(() => {
+            // Copy data to the already created Share table (from schema)
+            db.prepare(`
+                INSERT OR IGNORE INTO Share (id, key, name, permissions, createdAt, lastUsedAt, userId, privacyProfileId)
+                SELECT id, key, name, permissions, createdAt, lastUsedAt, userId, privacyProfileId FROM ApiKey
+            `).run();
+            
+            // Migrate ApiKeyPrivacyProfile
+            const hasAKPP = tables.some(t => t.name === 'ApiKeyPrivacyProfile');
+            if (hasAKPP) {
+                 db.prepare(`
+                    INSERT OR IGNORE INTO SharePrivacyProfile (shareId, privacyProfileId, sequence)
+                    SELECT apiKeyId, privacyProfileId, sequence FROM ApiKeyPrivacyProfile
+                 `).run();
+                 db.prepare("DROP TABLE ApiKeyPrivacyProfile").run();
+            }
+            
+            db.prepare("DROP TABLE ApiKey").run();
+            console.log("Migration: Successfully migrated ApiKey data to Share.");
+        })();
+    } else {
+        // If no old ApiKey table, just ensure Share columns are correct (for existing Share tables)
+        const shareCols = db.pragma('table_info(Share)') as any[];
+        if (shareCols.length > 0 && !shareCols.some(col => col.name === 'privacyProfileId')) {
+            db.prepare("ALTER TABLE Share ADD COLUMN privacyProfileId INTEGER").run();
+            console.log("Migration: Added 'privacyProfileId' column to Share table");
+        }
     }
 
     createDefaultUserAndTags();
