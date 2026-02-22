@@ -155,17 +155,36 @@ app.get('/api/v1/artifacts', (req, res) => {
   res.json(artifacts);
 });
 
+// Delete Artifact
+app.delete('/api/v1/artifacts/:hash', (req, res) => {
+    const hash = req.params.hash;
+    const artifact = db.prepare('SELECT storedPath FROM Artifact WHERE hash = ?').get(hash) as { storedPath: string } | undefined;
+
+    if (artifact) {
+        if (fs.existsSync(artifact.storedPath)) {
+            fs.unlinkSync(artifact.storedPath);
+        }
+        db.prepare('DELETE FROM Artifact WHERE hash = ?').run(hash);
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Not found' });
+    }
+});
+
 // HTML Storage View
 app.get('/storage-view', (req, res) => {
   const artifacts = db.prepare('SELECT hash, size, mimeType, createdAt FROM Artifact ORDER BY createdAt DESC').all() as any[];
   
   const rows = artifacts.map(a => `
-    <tr>
-      <td style="font-family: monospace;">${a.hash}</td>
+    <tr id="row-${a.hash}">
+      <td style="font-family: monospace; font-size: 12px;">${a.hash}</td>
       <td>${(a.size / 1024).toFixed(2)} KB</td>
       <td>${a.mimeType || 'unknown'}</td>
       <td>${a.createdAt}</td>
-      <td><a href="/api/v1/artifacts/${a.hash}/download" target="_blank">Download</a></td>
+      <td>
+        <a href="/api/v1/artifacts/${a.hash}/download" target="_blank">View</a>
+        <button onclick="deleteArtifact('${a.hash}')" style="margin-left: 10px; color: #ff6b6b; cursor: pointer; background: none; border: 1px solid #ff6b6b; border-radius: 4px; padding: 2px 8px;">Delete</button>
+      </td>
     </tr>
   `).join('');
 
@@ -183,6 +202,21 @@ app.get('/storage-view', (req, res) => {
           a:hover { text-decoration: underline; }
           h1 { color: #fff; }
         </style>
+        <script>
+          async function deleteArtifact(hash) {
+            if (!confirm('Are you sure you want to delete this artifact?')) return;
+            try {
+              const res = await fetch('/api/v1/artifacts/' + hash, { method: 'DELETE' });
+              if (res.ok) {
+                document.getElementById('row-' + hash).remove();
+              } else {
+                alert('Failed to delete');
+              }
+            } catch (err) {
+              alert('Error: ' + err.message);
+            }
+          }
+        </script>
       </head>
       <body>
         <h1>Scrinia Relay Artifacts</h1>
