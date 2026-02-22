@@ -15,39 +15,50 @@ PM2_NAME="scrinia-relay"
 echo "=== 🚀 Start Deployment: Scrinia Relay ==="
 
 # 1. Lokal bauen
-echo "🔨 [1/5] Baue TypeScript lokal..."
+echo "🔨 [1/6] Baue TypeScript Backend lokal..."
 cd relay
 npm install --silent
 npm run build
 if [ $? -ne 0 ]; then
-    echo "❌ Build fehlgeschlagen!"
+    echo "❌ Backend Build fehlgeschlagen!"
     exit 1
 fi
-cd ..
+
+echo "🔨 [2/6] Baue React Frontend lokal..."
+cd client
+npm install --silent
+npm run build
+if [ $? -ne 0 ]; then
+    echo "❌ Frontend Build fehlgeschlagen!"
+    exit 1
+fi
+cd ../..
 
 # 2. Artefakt vorbereiten
-echo "📦 [2/5] Erstelle Deployment-Paket..."
+echo "📦 [3/6] Erstelle Deployment-Paket..."
 rm -rf deploy_tmp
 mkdir -p deploy_tmp
+mkdir -p deploy_tmp/client
 
 # Wir kopieren nur das, was für die Produktion nötig ist
 cp relay/package.json deploy_tmp/
 cp relay/package-lock.json deploy_tmp/
 cp -r relay/dist deploy_tmp/
+cp -r relay/client/dist deploy_tmp/client/
 # Optional: .env kopieren, falls sie lokal verwaltet wird
 # cp relay/.env deploy_tmp/ 
 
 # 3. Übertragen
-echo "📡 [3/5] Übertrage Daten an $REMOTE_HOST..."
+echo "📡 [4/6] Übertrage Daten an $REMOTE_HOST..."
 # Rsync synchronisiert nur Änderungen
 rsync -avz --delete deploy_tmp/ $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/
 
 # 4. Remote Installation
-echo "🔧 [4/5] Installiere Abhängigkeiten auf dem Server..."
+echo "🔧 [5/6] Installiere Abhängigkeiten auf dem Server..."
 ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && npm install --omit=dev"
 
 # 5. Neustart (Robust: Restart oder Start)
-echo "🔄 [5/5] Starte Service via PM2..."
+echo "🔄 [6/6] Starte Service via PM2..."
 ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && (pm2 restart $PM2_NAME || pm2 start dist/index.js --name $PM2_NAME)"
 
 # Aufräumen
