@@ -215,14 +215,34 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
                     />
 
                     <Input.Wrapper label={t.cloudSync}>
-                        <div style={{ height: 36, display: 'flex', alignItems: 'center' }}>
+                        <Group gap="xs" style={{ height: 36, display: 'flex', alignItems: 'center' }}>
                             <Switch 
                                 size="md"
                                 checked={cloudSync}
                                 onChange={(e) => setCloudSync(e.currentTarget.checked)}
                                 thumbIcon={cloudSync ? <IconCloudCheck size={14} /> : <IconCloudX size={14} />}
                             />
-                        </div>
+                            {cloudSync && (
+                                <TextInput 
+                                    size="xs"
+                                    value={`http://localhost:3002/s/${share.key}`}
+                                    readOnly
+                                    rightSection={
+                                        <ActionIcon 
+                                            variant="subtle" 
+                                            size="xs"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(`http://localhost:3002/s/${share.key}`);
+                                                notifications.show({ message: t.copied, color: 'blue' });
+                                            }}
+                                        >
+                                            <IconCopy size={12} />
+                                        </ActionIcon>
+                                    }
+                                    style={{ width: 200 }}
+                                />
+                            )}
+                        </Group>
                     </Input.Wrapper>
 
                     <Input.Wrapper label={t.tags} style={{ flex: 1, minWidth: 220 }}>

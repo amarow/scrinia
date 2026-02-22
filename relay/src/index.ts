@@ -47,6 +47,13 @@ db.exec(`
   );
 `);
 
+// Migration: Add tags column if not exists
+try {
+  db.prepare('SELECT tags FROM AccessRule LIMIT 1').get();
+} catch (err) {
+  db.exec('ALTER TABLE AccessRule ADD COLUMN tags TEXT');
+}
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
@@ -111,7 +118,7 @@ app.post('/api/v1/artifacts/:hash', upload.single('file'), (req, res) => {
 // 3. Sync Share metadata and rules
 app.post('/api/v1/sync', (req, res) => {
   const { shareId, token, name, privacyConfig, files } = req.body;
-  // files: Array<{ hash: string, name: string }>
+  // files: Array<{ hash: string, name: string, tags?: string[] }>
 
   if (!token || !shareId) return res.status(400).json({ error: 'Missing share metadata' });
 
@@ -133,10 +140,10 @@ app.post('/api/v1/sync', (req, res) => {
 
     // Refresh access rules
     db.prepare('DELETE FROM AccessRule WHERE shareId = ?').run(internalShareId);
-    const insertRule = db.prepare('INSERT OR IGNORE INTO AccessRule (shareId, artifactHash, virtualFilename) VALUES (?, ?, ?)');
+    const insertRule = db.prepare('INSERT OR IGNORE INTO AccessRule (shareId, artifactHash, virtualFilename, tags) VALUES (?, ?, ?, ?)');
     
     for (const file of files) {
-      insertRule.run(internalShareId, file.hash, file.name);
+      insertRule.run(internalShareId, file.hash, file.name, JSON.stringify(file.tags || []));
     }
   })();
 
@@ -252,6 +259,88 @@ app.get('/api/v1/artifacts/:hash/download', (req, res) => {
     } else {
         res.status(404).send('Not Found');
     }
+});
+
+// --- Public API for Shared Links ---
+
+// 1. Get Share Metadata
+app.get('/api/v1/pub/share/:token', (req, res) => {
+    const token = req.params.token;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const share = db.prepare('SELECT * FROM Share WHERE tokenHash = ?').get(tokenHash) as any;
+
+    if (!share) {
+        return res.status(404).json({ error: 'Share not found' });
+    }
+
+    const files = db.prepare(`
+        SELECT ar.virtualFilename as name, ar.artifactHash as hash, a.size, a.mimeType, ar.tags
+        FROM AccessRule ar 
+        JOIN Artifact a ON ar.artifactHash = a.hash 
+        WHERE ar.shareId = ?
+    `).all(share.id);
+
+    const parsedFiles = files.map((f: any) => ({
+        ...f,
+        tags: f.tags ? JSON.parse(f.tags) : []
+    }));
+
+    res.json({
+        name: share.name,
+        privacyConfig: JSON.parse(share.privacyConfig || '{}'),
+        files: parsedFiles
+    });
+});
+
+// 2. Download File from Share
+app.get('/api/v1/pub/share/:token/download/:hash', (req, res) => {
+    const { token, hash } = req.params;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Verify access: The share must exist (via token) AND it must have an AccessRule for this artifact
+    const validAccess = db.prepare(`
+        SELECT 1 
+        FROM AccessRule ar 
+        JOIN Share s ON ar.shareId = s.id 
+        WHERE s.tokenHash = ? AND ar.artifactHash = ?
+    `).get(tokenHash, hash);
+
+    if (!validAccess) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const artifact = db.prepare('SELECT storedPath, mimeType FROM Artifact WHERE hash = ?').get(hash) as { storedPath: string, mimeType: string } | undefined;
+
+    if (artifact && fs.existsSync(artifact.storedPath)) {
+        res.setHeader('Content-Type', artifact.mimeType || 'application/octet-stream');
+        
+        // Get virtual filename for Content-Disposition
+        const fileInfo = db.prepare(`
+            SELECT virtualFilename 
+            FROM AccessRule ar 
+            JOIN Share s ON ar.shareId = s.id 
+            WHERE s.tokenHash = ? AND ar.artifactHash = ?
+        `).get(tokenHash, hash) as { virtualFilename: string };
+        
+        if (fileInfo) {
+             // Use 'inline' to allow browser to display if possible, but provide filename
+             res.setHeader('Content-Disposition', `inline; filename="${fileInfo.virtualFilename}"`);
+        }
+
+        res.sendFile(artifact.storedPath);
+    } else {
+        res.status(404).send('File not found');
+    }
+});
+
+
+// Serve Static Frontend
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// SPA Catch-All
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
 app.listen(Number(PORT) , "0.0.0.0" ,() => {

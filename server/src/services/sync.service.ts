@@ -60,7 +60,11 @@ export const syncService = {
             token: share.key,
             name: share.name,
             privacyConfig: privacyProfiles,
-            files: validFiles.map(f => ({ hash: f.hash, name: f.name }))
+            files: validFiles.map(f => ({ 
+                hash: f.hash, 
+                name: f.name,
+                tags: f.tags ? f.tags.map((t: any) => t.name) : [] 
+            }))
         };
 
         const res = await axios.post(`${RELAY_URL}/api/v1/sync`, syncPayload);
