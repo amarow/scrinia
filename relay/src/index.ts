@@ -55,7 +55,12 @@ const upload = multer({ dest: '/tmp/scrinia-relay-uploads' });
 // --- API Endpoints ---
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', component: 'Scrinia Relay (Local Test)' });
+  res.json({ 
+    status: 'ok', 
+    component: 'Scrinia Relay (Local Test)',
+    serverTime: new Date().toISOString(),
+    version: '1.0.1'
+  });
 });
 
 // 1. Check if artifact exists (CAS HEAD request)
