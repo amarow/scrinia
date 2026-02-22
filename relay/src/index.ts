@@ -10,6 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3002; // Local Relay uses 3002
 const STORAGE_DIR = path.join(__dirname, '../storage');
 const DB_PATH = path.join(__dirname, '../relay.db');
+const VERSION = "1.1.0"
 
 if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
 
@@ -59,7 +60,7 @@ app.get('/health', (req, res) => {
     status: 'ok', 
     component: 'Scrinia Relay (Local Test)',
     serverTime: new Date().toISOString(),
-    version: '1.0.1'
+    version: VERSION
   });
 });
 
@@ -146,6 +147,77 @@ app.post('/api/v1/sync', (req, res) => {
 app.get('/api/v1/shares', (req, res) => {
     const shares = db.prepare('SELECT * FROM Share').all();
     res.json(shares);
+});
+
+// 5. List all artifacts (for debugging)
+app.get('/api/v1/artifacts', (req, res) => {
+  const artifacts = db.prepare('SELECT hash, size, mimeType, createdAt FROM Artifact ORDER BY createdAt DESC').all();
+  res.json(artifacts);
+});
+
+// HTML Storage View
+app.get('/storage-view', (req, res) => {
+  const artifacts = db.prepare('SELECT hash, size, mimeType, createdAt FROM Artifact ORDER BY createdAt DESC').all() as any[];
+  
+  const rows = artifacts.map(a => `
+    <tr>
+      <td style="font-family: monospace;">${a.hash}</td>
+      <td>${(a.size / 1024).toFixed(2)} KB</td>
+      <td>${a.mimeType || 'unknown'}</td>
+      <td>${a.createdAt}</td>
+      <td><a href="/api/v1/artifacts/${a.hash}/download" target="_blank">Download</a></td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <html>
+      <head>
+        <title>Scrinia Relay Storage</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; background: #1a1b1e; color: #c1c2c5; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { text-align: left; padding: 12px; border-bottom: 1px solid #373a40; }
+          th { background: #25262b; }
+          tr:hover { background: #2c2e33; }
+          a { color: #4dabf7; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+          h1 { color: #fff; }
+        </style>
+      </head>
+      <body>
+        <h1>Scrinia Relay Artifacts</h1>
+        <p>Current Artifacts: ${artifacts.length}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Hash (SHA-256)</th>
+              <th>Size</th>
+              <th>MIME</th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+  res.send(html);
+});
+
+// Download Artifact
+app.get('/api/v1/artifacts/:hash/download', (req, res) => {
+    const hash = req.params.hash;
+    const artifact = db.prepare('SELECT storedPath, mimeType FROM Artifact WHERE hash = ?').get(hash) as { storedPath: string, mimeType: string } | undefined;
+
+    if (artifact && fs.existsSync(artifact.storedPath)) {
+        res.setHeader('Content-Type', artifact.mimeType || 'application/octet-stream');
+        res.sendFile(artifact.storedPath);
+    } else {
+        res.status(404).send('Not Found');
+    }
 });
 
 app.listen(Number(PORT) , "0.0.0.0" ,() => {
