@@ -222,26 +222,44 @@ export const ShareDetail = ({ shareId }: { shareId: number }) => {
                                 onChange={(e) => setCloudSync(e.currentTarget.checked)}
                                 thumbIcon={cloudSync ? <IconCloudCheck size={14} /> : <IconCloudX size={14} />}
                             />
-                            {cloudSync && (
-                                <TextInput 
-                                    size="xs"
-                                    value={`http://localhost:3002/s/${share.key}`}
-                                    readOnly
-                                    rightSection={
-                                        <ActionIcon 
-                                            variant="subtle" 
-                                            size="xs"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(`http://localhost:3002/s/${share.key}`);
-                                                notifications.show({ message: t.copied, color: 'blue' });
-                                            }}
-                                        >
-                                            <IconCopy size={12} />
-                                        </ActionIcon>
-                                    }
-                                    style={{ width: 200 }}
-                                />
-                            )}
+                            {cloudSync && (() => {
+                                const relayBase = import.meta.env.PROD 
+                                    ? 'https://scrina.duckdns.org' 
+                                    : 'http://localhost:3002';
+                                const shareUrl = `${relayBase}/s/${share.key}`;
+                                return (
+                                    <TextInput 
+                                        size="xs"
+                                        value={shareUrl}
+                                        readOnly
+                                        rightSection={
+                                            <Group gap={4} pr={4}>
+                                                <ActionIcon 
+                                                    variant="subtle" 
+                                                    size="xs"
+                                                    onClick={() => {
+                                                        window.open(shareUrl, '_blank');
+                                                    }}
+                                                >
+                                                    <IconExternalLink size={12} />
+                                                </ActionIcon>
+                                                <ActionIcon 
+                                                    variant="subtle" 
+                                                    size="xs"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(shareUrl);
+                                                        notifications.show({ message: t.copied, color: 'blue' });
+                                                    }}
+                                                >
+                                                    <IconCopy size={12} />
+                                                </ActionIcon>
+                                            </Group>
+                                        }
+                                        rightSectionWidth={60}
+                                        style={{ width: 240 }}
+                                    />
+                                );
+                            })()}
                         </Group>
                     </Input.Wrapper>
 
