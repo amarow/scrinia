@@ -2,7 +2,7 @@
 echo "Preparing Scrinia for PROD mode..."
 
 # Set Oracle Relay URL
-export RELAY_URL="http://141.144.238.99:3002"
+export RELAY_URL="https://scrina.duckdns.org"
 
 # Build and Start Backend
 echo "Building and Starting Backend (Sync -> $RELAY_URL)..."

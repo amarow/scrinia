@@ -1,13 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Title, Card, Group, Stack, Text, Button, ActionIcon, Badge, Modal, TextInput, MultiSelect } from '@mantine/core';
-import { IconPlus, IconKey, IconShieldLock, IconSettings, IconTrash, IconCopy, IconCheck, IconFlask } from '@tabler/icons-react';
-import { useAppStore } from '../../store';
-import { translations } from '../../i18n';
-import { modals } from '@mantine/modals';
-import { notifications } from '@mantine/notifications';
-import { useNavigate } from 'react-router-dom';
-
-import { useState, useEffect } from 'react';
 import { Title, Card, Group, Stack, Text, Button, ActionIcon, Badge, Modal, TextInput, MultiSelect, Switch } from '@mantine/core';
 import { IconPlus, IconShare, IconShieldLock, IconSettings, IconTrash, IconCopy, IconCheck, IconFlask, IconCloudCheck, IconCloudX } from '@tabler/icons-react';
 import { useAppStore } from '../../store';
